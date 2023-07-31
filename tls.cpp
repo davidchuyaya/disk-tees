@@ -11,93 +11,42 @@
 #include <arpa/inet.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
+#include <thread>
 #include "tls.hpp"
 
 static const char IP[] = "127.0.0.1";
-static const int PORT = 4433;
 
-int create_socket(int port)
+TLS::TLS(const std::vector<sockaddr_in> peers, const int port, 
+            const std::function<void(clientInPayload)> onClientMsg, 
+            const std::function<void(diskTeePayload)> onDiskTeeMsg) :
+            peers(peers), onClientMsg(onClientMsg), onDiskTeeMsg(onDiskTeeMsg) {
+    startServer(port);
+}
+
+void TLS::startServer(const int port)
 {
-    struct sockaddr_in addr;
+    // Ignore broken pipe signals
+    signal(SIGPIPE, SIG_IGN);
 
+    SSL_CTX *ctx = SSL_CTX_new(TLS_server_method());
+    configure_context(ctx, "server_cert.pem", "server_key.pem");
+
+    struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    int s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s < 0) {
-        perror("Unable to create socket");
-        exit(EXIT_FAILURE);
-    }
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
 
-    if (bind(s, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
+    if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         perror("Unable to bind");
         exit(EXIT_FAILURE);
     }
-
-    if (listen(s, 1) < 0) {
+    if (listen(sock, 1) < 0) {
         perror("Unable to listen");
         exit(EXIT_FAILURE);
     }
 
-    return s;
-}
-
-SSL_CTX *create_context(bool isServer)
-{
-    const SSL_METHOD* method = isServer ? TLS_server_method() : TLS_client_method();
-    SSL_CTX *ctx = SSL_CTX_new(method);
-    if (!ctx) {
-        perror("Unable to create SSL context");
-        ERR_print_errors_fp(stderr);
-        exit(EXIT_FAILURE);
-    }
-
-    return ctx;
-}
-
-/**
- * From https://forum.nim-lang.org/t/7484 on how to verify self-signed certificates.
- * In code here: https://github.com/benob/gemini/blob/master/src/gemini.nim#L268
- * and here: https://github.com/benob/gemini/blob/master/src/gemini/patched_asyncnet.nim#L17.
-*/
-int verifyCallback(int preverify, X509_STORE_CTX *store)
-{
-    int error = X509_STORE_CTX_get_error(store);
-    switch (error) {
-        case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
-        case X509_V_ERR_SELF_SIGNED_CERT_IN_CHAIN:
-            return 1;
-    }
-    return preverify;
-}
-
-void configure_context(SSL_CTX *ctx, const std::string cert, const std::string key)
-{
-    /* Set the key and cert */
-    if (SSL_CTX_use_certificate_file(ctx, cert.c_str(), SSL_FILETYPE_PEM) <= 0) {
-        ERR_print_errors_fp(stderr);
-        exit(EXIT_FAILURE);
-    }
-
-    if (SSL_CTX_use_PrivateKey_file(ctx, key.c_str(), SSL_FILETYPE_PEM) <= 0 ) {
-        ERR_print_errors_fp(stderr);
-        exit(EXIT_FAILURE);
-    }
-
-    // SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, verifyCallback);
-}
-
-void runServer()
-{
-    /* Ignore broken pipe signals */
-    signal(SIGPIPE, SIG_IGN);
-
-    SSL_CTX *ctx = create_context(true);
-    configure_context(ctx, "server_cert.pem", "server_key.pem");
-    int sock = create_socket(PORT);
-
-    /* Handle connections */
     while (true) {
         struct sockaddr_in addr;
         unsigned int len = sizeof(addr);
@@ -117,42 +66,19 @@ void runServer()
             ERR_print_errors_fp(stderr);
             return;
         }
-        
-        while (true) {
-            int readLen;
-            char readBuffer[256];
-            if ((readLen = SSL_read(ssl, readBuffer, 256)) <= 0) {
-                if (readLen == 0) {
-                    printf("Client closed connection\n");
-                } else {
-                    printf("SSL_read returned %d\n", readLen);
-                }
-                ERR_print_errors_fp(stderr);
-                break;
-            }
-            /* Insure null terminated input */
-            readBuffer[readLen] = 0;
-            printf("Received: %s", readBuffer);
-            /* Echo it back */
-            if (SSL_write(ssl, readBuffer, readLen) <= 0) {
-                ERR_print_errors_fp(stderr);
-            }
-        }
 
-        SSL_shutdown(ssl);
-        SSL_free(ssl);
-        close(client);
+        // Listen to the client on an async thread
+        std::thread connectionThread = std::thread(&TLS::threadListen, this, addr, ssl);
+        connectionThread.detach();
     }
 
+    // close server
     close(sock);
     SSL_CTX_free(ctx);
 }
 
-void runClient() {
-    /* Ignore broken pipe signals */
-    signal(SIGPIPE, SIG_IGN);
-
-    SSL_CTX *ctx = create_context(false);
+void runClient(const int port) {
+    SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
     SSL_CTX_load_verify_locations(ctx, "server_cert.pem", NULL);
     // configure_context(ctx, "client_cert.pem", "client_key.pem");
@@ -161,7 +87,7 @@ void runClient() {
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     inet_pton(AF_INET, IP, &(addr.sin_addr.s_addr));
-    addr.sin_port = htons(4433);
+    addr.sin_port = htons(port);
 
     if (connect(sock, (struct sockaddr*) &addr, sizeof(addr)) != 0) {
         perror("Unable to TCP connect to server");
@@ -220,6 +146,48 @@ void runClient() {
 
     SSL_shutdown(ssl);
     SSL_free(ssl);
-    close(sock);
+    close(SSL_get_fd(ssl));
     SSL_CTX_free(ctx);
+}
+
+void TLS::threadListen(const sockaddr_in senderAddr, SSL* sender) {
+    while (true) {
+        int readLen;
+        char readBuffer[256];
+        if ((readLen = SSL_read(sender, readBuffer, 256)) <= 0) {
+            if (readLen == 0) {
+                printf("Client closed connection\n");
+            } else {
+                printf("SSL_read returned %d\n", readLen);
+            }
+            ERR_print_errors_fp(stderr);
+            break;
+        }
+        /* Insure null terminated input */
+        readBuffer[readLen] = 0;
+        printf("Received: %s", readBuffer);
+        /* Echo it back */
+        if (SSL_write(sender, readBuffer, readLen) <= 0) {
+            ERR_print_errors_fp(stderr);
+        }
+    }
+    
+    // SSL shutdown, close socket
+    SSL_shutdown(sender);
+    SSL_free(sender);
+    close(SSL_get_fd(sender));
+}
+
+void TLS::configure_context(SSL_CTX *ctx, const std::string cert, const std::string key)
+{
+    /* Set the key and cert */
+    if (SSL_CTX_use_certificate_file(ctx, cert.c_str(), SSL_FILETYPE_PEM) <= 0) {
+        ERR_print_errors_fp(stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    if (SSL_CTX_use_PrivateKey_file(ctx, key.c_str(), SSL_FILETYPE_PEM) <= 0 ) {
+        ERR_print_errors_fp(stderr);
+        exit(EXIT_FAILURE);
+    }
 }
