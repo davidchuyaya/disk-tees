@@ -33,9 +33,11 @@ class TLS {
             const std::function<void(clientInPayload)> onClientMsg, 
             const std::function<void(diskTeePayload)> onDiskTeeMsg);
         void startServer();
-        void runClient(const sockaddr_in serverAddr);
-        void broadcastToPeers(); // TODO: Add payload parameter
-        void sendToClient(); // TODO: Add payload parameter
+        void connectToServer(const std::string serverIp, const sockaddr_in serverAddr);
+        template <class T>
+        void broadcastToPeers(const T& payload); 
+        template <class T>
+        void sendToClient(const T& payload); 
 
     private:
         const int myID;
@@ -43,12 +45,15 @@ class TLS {
         const std::function<void(clientInPayload)> onClientMsg;
         const std::function<void(diskTeePayload)> onDiskTeeMsg;
         
-        SSL* client;
         std::shared_mutex connectionsMutex;
-        std::map<sockaddr_in, SSL*> connections;
+        SSL* client;
+        std::map<std::string, SSL*> connections;
 
-        void threadListen(const sockaddr_in senderAddr, SSL* sender);
+        void threadListen(const std::string senderIp, const sockaddr_in senderAddr, SSL* sender);
         void loadOwnCertificates(SSL_CTX *ctx);
         void loadAcceptableCertificates(SSL_CTX *ctx);
+        std::string ipFromSockAddr(const sockaddr_in& addr); // Includes port
+        template <class T>
+        std::vector<std::byte> serialize(const T& payload);
         std::string errorMessage(const std::errc errorCode);
 };

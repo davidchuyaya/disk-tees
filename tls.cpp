@@ -15,6 +15,7 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <thread>
+#include <mutex>
 #include "zpp_bits.h"
 #include "tls.hpp"
 
@@ -29,7 +30,8 @@ TLS::TLS(const int myID, const networkConfig netConf,
     for (int i = 0; i < netConf.peers.size(); i++) {
         if (i == myID)
             continue;
-        std::thread(&TLS::runClient, this, netConf.peers[i]).detach();
+        const sockaddr_in& peer = netConf.peers[i];
+        std::thread(&TLS::connectToServer, this, ipFromSockAddr(peer), peer).detach();
     }
     startServer();
 }
@@ -84,8 +86,16 @@ void TLS::startServer()
 
         std::cout << "Client SSL connection accepted" << std::endl;
 
+        // Add connection to map
+        // TODO: If connection already exists, something's going on (TLS impersonation)
+        const std::string ip = ipFromSockAddr(addr);
+        {
+            std::unique_lock lock(connectionsMutex);
+            connections.emplace(ip, ssl);
+        }
+
         // Listen to the client on an async thread
-        std::thread connectionThread = std::thread(&TLS::threadListen, this, addr, ssl);
+        std::thread connectionThread = std::thread(&TLS::threadListen, this, ip, addr, ssl);
         connectionThread.detach();
     }
 
@@ -94,7 +104,7 @@ void TLS::startServer()
     SSL_CTX_free(ctx);
 }
 
-void TLS::runClient(const sockaddr_in serverAddr) {
+void TLS::connectToServer(const std::string serverIp, const sockaddr_in serverAddr) {
     SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
     loadAcceptableCertificates(ctx);
@@ -110,7 +120,6 @@ void TLS::runClient(const sockaddr_in serverAddr) {
         std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_TIMEOUT_SEC));
     }
     std::cout << "TCP connection to server successful" << std::endl;
-
     
     SSL *ssl = SSL_new(ctx);
     SSL_set_fd(ssl, sock);
@@ -123,6 +132,12 @@ void TLS::runClient(const sockaddr_in serverAddr) {
     }
 
     std::cout << "SSL connection to server successful" << std::endl;
+
+    // Add connection to map
+    {
+        std::unique_lock lock(connectionsMutex);
+        connections.emplace(serverIp, ssl);
+    }
 
     /* Loop to send input from keyboard */
     while (true) {
@@ -165,13 +180,20 @@ void TLS::runClient(const sockaddr_in serverAddr) {
         }
     }
 
+    // TODO: Instead of ever releasing the socket, the client should always try to reconnect
+    // Remove the connection from the map
+    {
+        std::unique_lock lock(connectionsMutex);
+        connections.erase(serverIp);
+    }
+
     SSL_shutdown(ssl);
     SSL_free(ssl);
     close(SSL_get_fd(ssl));
     SSL_CTX_free(ctx);
 }
 
-void TLS::threadListen(const sockaddr_in senderAddr, SSL* sender) {
+void TLS::threadListen(const std::string senderIp, const sockaddr_in senderAddr, SSL* sender) {
     while (true) {
         int readLen;
         char readBuffer[READ_BUFFER_SIZE];
@@ -205,16 +227,47 @@ void TLS::threadListen(const sockaddr_in senderAddr, SSL* sender) {
         }
         
         if (SSL_write(sender, sendData.data(), sendData.size()) <= 0) {
-            printf("Client closed connection on SSL_read\n");
+            printf("Client closed connection on SSL_write\n");
             ERR_print_errors_fp(stderr);
             break;
         }
+    }
+
+    // Remove the connection from the map
+    {
+        std::unique_lock lock(connectionsMutex);
+        connections.erase(senderIp);
     }
     
     // SSL shutdown, close socket
     SSL_shutdown(sender);
     SSL_free(sender);
     close(SSL_get_fd(sender));
+}
+
+template <class T>
+void TLS::broadcastToPeers(const T& payload) {
+    auto sendData = serialize(payload);
+
+    std::shared_lock lock(connectionsMutex);
+    for (const auto& [name, ssl] : connections) {
+        if (SSL_write(ssl, sendData.data(), sendData.size()) <= 0) {
+            std::cerr << "Tried to write to broken peer" << std::endl;
+            ERR_print_errors_fp(stderr);
+            continue;
+        }
+    }
+}
+
+template <class T>
+void TLS::sendToClient(const T& payload) {
+    auto sendData = serialize(payload);
+
+    std::shared_lock lock(connectionsMutex);
+    if (SSL_write(client, sendData.data(), sendData.size()) <= 0) {
+        std::cerr << "Tried to write to broken client" << std::endl;
+        ERR_print_errors_fp(stderr);
+    }
 }
 
 void TLS::loadOwnCertificates(SSL_CTX *ctx) {
@@ -234,6 +287,23 @@ void TLS::loadAcceptableCertificates(SSL_CTX *ctx) {
     for (const std::string& name : netConf.names) {
         SSL_CTX_load_verify_locations(ctx, (name + "_cert.pem").c_str(), NULL);
     }
+}
+
+std::string TLS::ipFromSockAddr(const sockaddr_in& addr) {
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(addr.sin_addr), ip, INET_ADDRSTRLEN);
+    return std::string(ip) + ":" + std::to_string(ntohs(addr.sin_port));
+}
+
+template <class T>
+std::vector<std::byte> TLS::serialize(const T& payload) {
+    auto [sendData, out] = zpp::bits::data_out();
+    auto serializeResult = out(payload);
+    if (failure(serializeResult)) {
+        std::cerr << "Unable to serialize payload, error: " << errorMessage(serializeResult) << std::endl;
+        return {};
+    }
+    return sendData;
 }
 
 /**
