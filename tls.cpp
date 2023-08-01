@@ -15,9 +15,11 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <thread>
+#include "zpp_bits.h"
 #include "tls.hpp"
 
 static const int CONNECTION_RETRY_TIMEOUT_SEC = 5;
+static const int READ_BUFFER_SIZE = 256;
 
 TLS::TLS(const int myID, const networkConfig netConf,
             const std::function<void(clientInPayload)> onClientMsg, 
@@ -124,38 +126,42 @@ void TLS::runClient(const sockaddr_in serverAddr) {
 
     /* Loop to send input from keyboard */
     while (true) {
-        char* txbuf = NULL;
-        size_t txcap = sizeof(txbuf);
-        /* Get a line of input */
-        int txlen = getline(&txbuf, &txcap, stdin);
-        /* Exit loop on error */
-        if (txlen < 0 || txbuf == NULL) {
-            break;
+        auto [sendData, out] = zpp::bits::data_out();
+        std::string input;
+        std::getline(std::cin, input);
+        diskTeePayload sendPayload = { .data = input };
+        auto serializeResult = out(sendPayload);
+        if (failure(serializeResult)) {
+            std::cerr << "Unable to serialize payload, error: " << errorMessage(serializeResult) << std::endl;
+            continue;
         }
-        /* Exit loop if just a carriage return */
-        if (txbuf[0] == '\n') {
-            break;
-        }
+        
         /* Send it to the server */
         int result;
-        if ((result = SSL_write(ssl, txbuf, txlen)) <= 0) {
-            printf("Server closed connection\n");
+        if ((result = SSL_write(ssl, sendData.data(), sendData.size())) <= 0) {
+            printf("Server closed connection on SSL_write\n");
             ERR_print_errors_fp(stderr);
             break;
         }
 
         /* Wait for the echo */
-        char rxbuf[256];
-        size_t rxcap = sizeof(rxbuf);
-        int rxlen = SSL_read(ssl, rxbuf, rxcap);
+        char rxbuf[READ_BUFFER_SIZE];
+        int rxlen = SSL_read(ssl, rxbuf, READ_BUFFER_SIZE);
         if (rxlen <= 0) {
-            printf("Server closed connection\n");
+            printf("Server closed connection on SSL_read\n");
             ERR_print_errors_fp(stderr);
             break;
         } else {
             /* Show it */
-            rxbuf[rxlen] = 0;
-            printf("Received: %s", rxbuf);
+            zpp::bits::in in(rxbuf);
+            diskTeePayload recvPayload;
+            auto deserializeResult = in(recvPayload);
+            if (failure(deserializeResult)) {
+                std::cerr << "Unable to deserialize payload, error: " << errorMessage(deserializeResult) << std::endl;
+                continue;
+            }
+            
+            std::cout << "Received: " << recvPayload.data << std::endl;
         }
     }
 
@@ -168,22 +174,40 @@ void TLS::runClient(const sockaddr_in serverAddr) {
 void TLS::threadListen(const sockaddr_in senderAddr, SSL* sender) {
     while (true) {
         int readLen;
-        char readBuffer[256];
-        if ((readLen = SSL_read(sender, readBuffer, 256)) <= 0) {
+        char readBuffer[READ_BUFFER_SIZE];
+
+        if ((readLen = SSL_read(sender, readBuffer, READ_BUFFER_SIZE)) <= 0) {
             if (readLen == 0) {
-                printf("Client closed connection\n");
+                printf("Client closed connection on SSL_read\n");
             } else {
                 printf("SSL_read returned %d\n", readLen);
             }
             ERR_print_errors_fp(stderr);
             break;
         }
-        /* Insure null terminated input */
-        readBuffer[readLen] = 0;
-        printf("Received: %s", readBuffer);
+        
+        zpp::bits::in in(readBuffer);
+        diskTeePayload recvPayload;
+        auto deserializeResult = in(recvPayload);
+        if (failure(deserializeResult)) {
+            std::cerr << "Unable to deserialize payload, error: " << errorMessage(deserializeResult) << std::endl;
+            continue;
+        }
+
+        std::cout << "Received: " << recvPayload.data << std::endl;
+
         /* Echo it back */
-        if (SSL_write(sender, readBuffer, readLen) <= 0) {
+        auto [sendData, out] = zpp::bits::data_out();
+        auto serializeResult = out(recvPayload);
+        if (failure(serializeResult)) {
+            std::cerr << "Unable to serialize payload, error: " << errorMessage(serializeResult) << std::endl;
+            continue;
+        }
+        
+        if (SSL_write(sender, sendData.data(), sendData.size()) <= 0) {
+            printf("Client closed connection on SSL_read\n");
             ERR_print_errors_fp(stderr);
+            break;
         }
     }
     
@@ -209,5 +233,31 @@ void TLS::loadOwnCertificates(SSL_CTX *ctx) {
 void TLS::loadAcceptableCertificates(SSL_CTX *ctx) {
     for (const std::string& name : netConf.names) {
         SSL_CTX_load_verify_locations(ctx, (name + "_cert.pem").c_str(), NULL);
+    }
+}
+
+/**
+ * From https://github.com/eyalz800/zpp_bits#error-codes.
+*/
+std::string TLS::errorMessage(const std::errc errorCode) {
+    switch (errorCode) {
+        case std::errc::result_out_of_range:
+            return "attempting to write or read from a too short buffer";
+        case std::errc::no_buffer_space:
+            return "growing buffer would grow beyond the allocation limits or overflow";
+        case std::errc::value_too_large:
+            return "varint (variable length integer) encoding is beyond the representation limits";
+        case std::errc::message_size:
+            return "message size is beyond the user defined allocation limits";
+        case std::errc::not_supported:
+            return "attempt to call an RPC that is not listed as supported";
+        case std::errc::bad_message:
+            return "attempt to read a variant of unrecognized type";
+        case std::errc::invalid_argument:
+            return "attempting to serialize null pointer or a value-less variant";
+        case std::errc::protocol_error:
+            return "attempt to deserialize an invalid protocol message";
+        default:
+            return "unknown error";
     }
 }

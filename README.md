@@ -26,3 +26,10 @@ Execute the following on your local computer:
 ```bash
 cloud_scripts/cleanup_untrusted.sh
 ```
+
+## Libraries
+This project makes use of the following C++ libraries:
+
+- [OpenSSL](https://wiki.openssl.org/index.php/Main_Page) - Used for TLS encrypted connections
+- [JSON for modern C++](https://github.com/nlohmann/json#examples) - Used for reading JSON config files
+- [zpp::bits](https://github.com/eyalz800/zpp_bits) - Used for fast serializing/deserializing of CPP structs. Requires C++20

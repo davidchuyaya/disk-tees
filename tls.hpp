@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <functional>
+#include <string>
 #include "network_config.hpp"
 
 struct clientInPayload {
@@ -23,6 +24,7 @@ struct clientOutPayload {
 
 struct diskTeePayload {
     // TODO: Message types for recovery
+    std::string data;
 };
 
 class TLS {
@@ -48,4 +50,5 @@ class TLS {
         void threadListen(const sockaddr_in senderAddr, SSL* sender);
         void loadOwnCertificates(SSL_CTX *ctx);
         void loadAcceptableCertificates(SSL_CTX *ctx);
+        std::string errorMessage(const std::errc errorCode);
 };
