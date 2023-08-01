@@ -1,9 +1,11 @@
+#pragma once
 #include <openssl/ssl.h>
 #include <arpa/inet.h>
 #include <shared_mutex>
 #include <map>
 #include <vector>
 #include <functional>
+#include "network_config.hpp"
 
 struct clientInPayload {
     // TODO: Writes from the client
@@ -25,14 +27,17 @@ struct diskTeePayload {
 
 class TLS {
     public:
-        TLS(const std::vector<sockaddr_in> peers, const int port, 
+        TLS(const int myID, const networkConfig netConf,
             const std::function<void(clientInPayload)> onClientMsg, 
             const std::function<void(diskTeePayload)> onDiskTeeMsg);
+        void startServer();
+        void runClient(const sockaddr_in serverAddr);
         void broadcastToPeers(); // TODO: Add payload parameter
         void sendToClient(); // TODO: Add payload parameter
 
     private:
-        const std::vector<sockaddr_in> peers;
+        const int myID;
+        const networkConfig netConf;
         const std::function<void(clientInPayload)> onClientMsg;
         const std::function<void(diskTeePayload)> onDiskTeeMsg;
         
@@ -40,10 +45,7 @@ class TLS {
         std::shared_mutex connectionsMutex;
         std::map<sockaddr_in, SSL*> connections;
 
-        void startServer(const int port);
-        void connectToServer(const sockaddr_in server);
         void threadListen(const sockaddr_in senderAddr, SSL* sender);
-        void configure_context(SSL_CTX *ctx, const std::string cert, const std::string key);
+        void loadOwnCertificates(SSL_CTX *ctx);
+        void loadAcceptableCertificates(SSL_CTX *ctx);
 };
-
-void runClient(const int port);

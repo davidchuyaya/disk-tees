@@ -2,10 +2,10 @@
 #include <chrono>
 #include <unistd.h>
 #include "tls.hpp"
+#include "network_config.hpp"
 
 struct config {
-    bool isServer;
-    int port;
+    int id;
 };
 
 std::chrono::steady_clock::time_point getTime() {
@@ -30,13 +30,10 @@ config parseArgs(int argc, char* argv[]) {
 
     // TODO: Parse command line agruments
     int opt;
-    while ((opt = getopt(argc, argv, "sp:")) != -1) {
+    while ((opt = getopt(argc, argv, "i:")) != -1) {
         switch (opt) {
-            case 's':
-                conf.isServer = true;
-                break;
-            case 'p':
-                conf.port = atoi(optarg);
+            case 'i':
+                conf.id = atoi(optarg);
                 break;
             case '?':
                 exit(EXIT_FAILURE);
@@ -48,18 +45,15 @@ config parseArgs(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     config conf = parseArgs(argc, argv);
+    networkConfig netConf = readNetworkConfig("network.json");
 
-    if (conf.isServer) {
-        std::vector<sockaddr_in> peers;
-        TLS tls(peers, conf.port, [](clientInPayload payload) {
-            std::cout << "Received message from client" << std::endl;
-        }, [](diskTeePayload payload) {
-            std::cout << "Received message from disk tee" << std::endl;
-        });
-    }
-    else {
-        runClient(conf.port);
-    }
+    TLS tls(conf.id, netConf, [](clientInPayload payload) { // TODO: Replace
+        std::cout << "Received message from client" << std::endl;
+    }, [](diskTeePayload payload) {
+        std::cout << "Received message from disk tee" << std::endl;
+    });
+
+    
 
     return 0;
 }

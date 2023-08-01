@@ -53,7 +53,7 @@ def download_certificates(vms):
         name = vm['name']
         publicIp = vm['publicIps']
         # Download each server's certificate and rename it to their name
-        subprocess.run(['scp', f'azureuser@{publicIp}:~/server_cert.pem', f'{name}.pem',
+        subprocess.run(['scp', f'azureuser@{publicIp}:~/server_cert.pem', f'{name}_cert.pem',
                         '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null']) # Don't check host key
 
 def distribute_certificates_and_network_json(vms):
@@ -66,7 +66,7 @@ def distribute_certificates_and_network_json(vms):
         for other_vm in vms:
             other_name = other_vm['name']
             if name != other_name:
-                subprocess.run(['scp', f'{other_name}.pem', f'azureuser@{publicIp}:~/{other_name}.pem',
+                subprocess.run(['scp', f'{other_name}.pem', f'azureuser@{publicIp}:~/{other_name}_cert.pem',
                         '-o', 'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null']) # Don't check host key
     
 if __name__ == "__main__":

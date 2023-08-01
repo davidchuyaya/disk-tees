@@ -1,11 +1,14 @@
 /**
+ * Open TLS connections between machines, start a server, listen to clients.
+ * 
  * Mostly based on https://github.com/openssl/openssl/blob/master/demos/sslecho/main.c.
- * Certificates are self-signed.
+ * Assumes that certificates are self-signed.
 */
 
 #include <stdio.h>
 #include <unistd.h>
 #include <string>
+#include <iostream>
 #include <signal.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -14,58 +17,70 @@
 #include <thread>
 #include "tls.hpp"
 
-static const char IP[] = "127.0.0.1";
+static const int CONNECTION_RETRY_TIMEOUT_SEC = 5;
 
-TLS::TLS(const std::vector<sockaddr_in> peers, const int port, 
+TLS::TLS(const int myID, const networkConfig netConf,
             const std::function<void(clientInPayload)> onClientMsg, 
             const std::function<void(diskTeePayload)> onDiskTeeMsg) :
-            peers(peers), onClientMsg(onClientMsg), onDiskTeeMsg(onDiskTeeMsg) {
-    startServer(port);
+            myID(myID), netConf(netConf), onClientMsg(onClientMsg), onDiskTeeMsg(onDiskTeeMsg) {
+    // Connect to peers asynchronously
+    for (int i = 0; i < netConf.peers.size(); i++) {
+        if (i == myID)
+            continue;
+        std::thread(&TLS::runClient, this, netConf.peers[i]).detach();
+    }
+    startServer();
 }
 
-void TLS::startServer(const int port)
+void TLS::startServer()
 {
     // Ignore broken pipe signals
     signal(SIGPIPE, SIG_IGN);
 
     SSL_CTX *ctx = SSL_CTX_new(TLS_server_method());
-    configure_context(ctx, "server_cert.pem", "server_key.pem");
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    loadAcceptableCertificates(ctx);
+    loadOwnCertificates(ctx);
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
+    addr.sin_port = netConf.peers[myID].sin_port;
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
 
     if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
-        perror("Unable to bind");
+        std::cerr << "Unable to bind" << std::endl;
         exit(EXIT_FAILURE);
     }
     if (listen(sock, 1) < 0) {
-        perror("Unable to listen");
+        std::cerr << "Unable to listen" << std::endl;
         exit(EXIT_FAILURE);
     }
 
+    std::cout << "Started server" << std::endl;
+
     while (true) {
-        struct sockaddr_in addr;
+        sockaddr_in addr;
         unsigned int len = sizeof(addr);
 
         int client = accept(sock, (struct sockaddr*)&addr, &len);
         if (client < 0) {
-            perror("Unable to accept");
-            return;
+            std::cerr << "Unable to accept" << std::endl;
+            continue;
         }
 
-        printf("Client TCP connection accepted\n");
+        std::cout << "Client TCP connection accepted" << std::endl;
 
         SSL *ssl = SSL_new(ctx);
         SSL_set_fd(ssl, client);
 
         if (SSL_accept(ssl) <= 0) {
             ERR_print_errors_fp(stderr);
-            return;
+            continue;
         }
+
+        std::cout << "Client SSL connection accepted" << std::endl;
 
         // Listen to the client on an async thread
         std::thread connectionThread = std::thread(&TLS::threadListen, this, addr, ssl);
@@ -77,35 +92,35 @@ void TLS::startServer(const int port)
     SSL_CTX_free(ctx);
 }
 
-void runClient(const int port) {
+void TLS::runClient(const sockaddr_in serverAddr) {
     SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
-    SSL_CTX_load_verify_locations(ctx, "server_cert.pem", NULL);
-    // configure_context(ctx, "client_cert.pem", "client_key.pem");
+    loadAcceptableCertificates(ctx);
+    loadOwnCertificates(ctx);
     int sock = socket(AF_INET, SOCK_STREAM, 0);
 
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    inet_pton(AF_INET, IP, &(addr.sin_addr.s_addr));
-    addr.sin_port = htons(port);
+    // Get IP address (string) out from sockaddr_in
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(serverAddr.sin_addr), ip, INET_ADDRSTRLEN);
 
-    if (connect(sock, (struct sockaddr*) &addr, sizeof(addr)) != 0) {
-        perror("Unable to TCP connect to server");
-        return;
+    while (connect(sock, (struct sockaddr*) &serverAddr, sizeof(serverAddr)) != 0) {
+        std::cout << "Unable to TCP connect to server " << ip << ", retrying in " << CONNECTION_RETRY_TIMEOUT_SEC << "s..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_TIMEOUT_SEC));
     }
-    printf("TCP connection to server successful\n");
+    std::cout << "TCP connection to server successful" << std::endl;
 
+    
     SSL *ssl = SSL_new(ctx);
     SSL_set_fd(ssl, sock);
-    SSL_set_tlsext_host_name(ssl, IP);
-    SSL_set1_host(ssl, IP);
+    SSL_set_tlsext_host_name(ssl, ip);
+    SSL_set1_host(ssl, ip);
 
     if (SSL_connect(ssl) <= 0) {
         ERR_print_errors_fp(stderr);
         return;
     }
 
-    printf("SSL connection to server successful\n\n");
+    std::cout << "SSL connection to server successful" << std::endl;
 
     /* Loop to send input from keyboard */
     while (true) {
@@ -178,16 +193,21 @@ void TLS::threadListen(const sockaddr_in senderAddr, SSL* sender) {
     close(SSL_get_fd(sender));
 }
 
-void TLS::configure_context(SSL_CTX *ctx, const std::string cert, const std::string key)
-{
+void TLS::loadOwnCertificates(SSL_CTX *ctx) {
     /* Set the key and cert */
-    if (SSL_CTX_use_certificate_file(ctx, cert.c_str(), SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_certificate_file(ctx, (netConf.names[myID] + "_cert.pem").c_str(), SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, key.c_str(), SSL_FILETYPE_PEM) <= 0 ) {
+    if (SSL_CTX_use_PrivateKey_file(ctx, (netConf.names[myID] + "_key.pem").c_str(), SSL_FILETYPE_PEM) <= 0 ) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
+    }
+}
+
+void TLS::loadAcceptableCertificates(SSL_CTX *ctx) {
+    for (const std::string& name : netConf.names) {
+        SSL_CTX_load_verify_locations(ctx, (name + "_cert.pem").c_str(), NULL);
     }
 }
