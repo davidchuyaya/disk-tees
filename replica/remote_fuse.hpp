@@ -81,5 +81,5 @@ class Fuse {
 private:
     std::map<int, int> fileHandleConverter;
 
-    void create(const createParams& params);
+    void remote_create(const createParams& params);
 };

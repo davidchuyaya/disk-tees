@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/_deps/zpp-src",
-                "${workspaceFolder}/_deps/**"
+                "${workspaceFolder}/_deps/**",
+                "/usr/local/include/fuse3"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/g++",

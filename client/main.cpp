@@ -1,9 +1,7 @@
-#define FUSE_USE_VERSION 31
-#include <fuse.h>
+#include "tee_fuse.hpp"
 
-static const struct fuse_operations xmp_oper = {};
-
-int main(int argc, char* argv[]) {
-    fuse_main(argc, argv, &xmp_oper, NULL);
-    return 0;
+int main(int argc, char *argv[])
+{
+    TeeFuse fuse;
+    return fuse.run(argc, argv);
 }
