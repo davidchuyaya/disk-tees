@@ -4,7 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "${workspaceFolder}/_deps/zpp-src"
+                "${workspaceFolder}/_deps/zpp-src",
+                "${workspaceFolder}/_deps/**"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/g++",

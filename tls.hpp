@@ -6,6 +6,7 @@
 #include <vector>
 #include <functional>
 #include <string>
+#include <span>
 #include "network_config.hpp"
 
 struct clientInPayload {
@@ -29,11 +30,11 @@ struct diskTeePayload {
 
 class TLS {
     public:
-        TLS(const int myID, const networkConfig netConf,
+        TLS(const int myID, const std::vector<networkConfig> netConf,
             const std::function<void(clientInPayload)> onClientMsg, 
             const std::function<void(diskTeePayload)> onDiskTeeMsg);
         void startServer();
-        void connectToServer(const std::string serverIp, const sockaddr_in serverAddr);
+        void connectToServer(const networkConfig& peer);
         template <class T>
         void broadcastToPeers(const T& payload); 
         template <class T>
@@ -41,7 +42,7 @@ class TLS {
 
     private:
         const int myID;
-        const networkConfig netConf;
+        const std::vector<networkConfig> netConf;
         const std::function<void(clientInPayload)> onClientMsg;
         const std::function<void(diskTeePayload)> onDiskTeeMsg;
         
@@ -49,11 +50,13 @@ class TLS {
         SSL* client;
         std::map<std::string, SSL*> connections;
 
-        void threadListen(const std::string senderIp, const sockaddr_in senderAddr, SSL* sender);
+        void threadListen(const std::string senderReadableAddr, const sockaddr_in senderAddr, SSL* sender);
         void loadOwnCertificates(SSL_CTX *ctx);
         void loadAcceptableCertificates(SSL_CTX *ctx);
-        std::string ipFromSockAddr(const sockaddr_in& addr); // Includes port
+        std::string readableAddr(const sockaddr_in& addr); // Format: ip::port
         template <class T>
-        std::vector<std::byte> serialize(const T& payload);
+        void send(const T& payload, SSL* dest);
+        template <class T>
+        T recv(std::span<char> buffer, SSL* src); // Will allocate a new buffer if provided buffer doesn't fit
         std::string errorMessage(const std::errc errorCode);
 };

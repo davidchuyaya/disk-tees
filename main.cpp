@@ -6,6 +6,7 @@
 
 struct config {
     int id;
+    std::string dir;
 };
 
 std::chrono::steady_clock::time_point getTime() {
@@ -23,17 +24,21 @@ int toMicroseconds(int seconds) {
 config parseArgs(int argc, char* argv[]) {
     config conf = {};
 
-    // TODO: set default values
+    // set default values
     if (argc == 1) {
+        conf.dir = ".";
         return conf;
     }
 
-    // TODO: Parse command line agruments
+    // Parse command line agruments
     int opt;
-    while ((opt = getopt(argc, argv, "i:")) != -1) {
+    while ((opt = getopt(argc, argv, "i:d:")) != -1) {
         switch (opt) {
             case 'i':
                 conf.id = atoi(optarg);
+                break;
+            case 'd': // directory, no ending slash
+                conf.dir = optarg;
                 break;
             case '?':
                 exit(EXIT_FAILURE);
@@ -45,7 +50,7 @@ config parseArgs(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     config conf = parseArgs(argc, argv);
-    networkConfig netConf = readNetworkConfig("network.json");
+    std::vector<networkConfig> netConf = readNetworkConfig("network.json");
 
     TLS tls(conf.id, netConf, [](clientInPayload payload) { // TODO: Replace
         std::cout << "Received message from client" << std::endl;

@@ -4,8 +4,20 @@
 #include <vector>
 
 struct networkConfig {
-    std::vector<sockaddr_in> peers;
-    std::vector<std::string> names;
+    std::string ip;
+    int port;
+    std::string name;
 };
 
-networkConfig readNetworkConfig(const std::string file);
+/**
+ * Expected JSON format:
+ * [
+ *   {
+ *     "ip": "127.0.0.1",
+ *     "port": 4433,
+ *     "name": "disk_tee0", // Certificate should be disk_tee0.pem
+ *     "id": 0 // 0-indexed
+ *   }
+ * ]
+*/
+std::vector<networkConfig> readNetworkConfig(const std::string& file);

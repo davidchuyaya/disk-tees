@@ -16,22 +16,24 @@
 #include <openssl/err.h>
 #include <thread>
 #include <mutex>
+#include <memory>
+#include <stdexcept>
 #include "zpp_bits.h"
 #include "tls.hpp"
 
 static const int CONNECTION_RETRY_TIMEOUT_SEC = 5;
-static const int READ_BUFFER_SIZE = 256;
+static const int READ_BUFFER_SIZE = 8192;
 
-TLS::TLS(const int myID, const networkConfig netConf,
+TLS::TLS(const int myID, const std::vector<networkConfig> netConf,
             const std::function<void(clientInPayload)> onClientMsg, 
             const std::function<void(diskTeePayload)> onDiskTeeMsg) :
             myID(myID), netConf(netConf), onClientMsg(onClientMsg), onDiskTeeMsg(onDiskTeeMsg) {
     // Connect to peers asynchronously
-    for (int i = 0; i < netConf.peers.size(); i++) {
+    for (int i = 0; i < netConf.size(); i++) {
         if (i == myID)
             continue;
-        const sockaddr_in& peer = netConf.peers[i];
-        std::thread(&TLS::connectToServer, this, ipFromSockAddr(peer), peer).detach();
+        const networkConfig& peer = netConf[i];
+        std::thread(&TLS::connectToServer, this, peer).detach();
     }
     startServer();
 }
@@ -48,7 +50,7 @@ void TLS::startServer()
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
-    addr.sin_port = netConf.peers[myID].sin_port;
+    addr.sin_port = htons(netConf[myID].port);
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -88,14 +90,14 @@ void TLS::startServer()
 
         // Add connection to map
         // TODO: If connection already exists, something's going on (TLS impersonation)
-        const std::string ip = ipFromSockAddr(addr);
+        const std::string key = readableAddr(addr);
         {
             std::unique_lock lock(connectionsMutex);
-            connections.emplace(ip, ssl);
+            connections.emplace(key, ssl);
         }
 
         // Listen to the client on an async thread
-        std::thread connectionThread = std::thread(&TLS::threadListen, this, ip, addr, ssl);
+        std::thread connectionThread = std::thread(&TLS::threadListen, this, key, addr, ssl);
         connectionThread.detach();
     }
 
@@ -104,79 +106,63 @@ void TLS::startServer()
     SSL_CTX_free(ctx);
 }
 
-void TLS::connectToServer(const std::string serverIp, const sockaddr_in serverAddr) {
+void TLS::connectToServer(const networkConfig& peer) {
     SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
     loadAcceptableCertificates(ctx);
     loadOwnCertificates(ctx);
+
     int sock = socket(AF_INET, SOCK_STREAM, 0);
-
-    // Get IP address (string) out from sockaddr_in
-    char ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(serverAddr.sin_addr), ip, INET_ADDRSTRLEN);
-
-    while (connect(sock, (struct sockaddr*) &serverAddr, sizeof(serverAddr)) != 0) {
-        std::cout << "Unable to TCP connect to server " << ip << ", retrying in " << CONNECTION_RETRY_TIMEOUT_SEC << "s..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_TIMEOUT_SEC));
-    }
-    std::cout << "TCP connection to server successful" << std::endl;
+    sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(peer.port);   
+    inet_pton(AF_INET, peer.ip.c_str(), &(serverAddr.sin_addr.s_addr));
     
     SSL *ssl = SSL_new(ctx);
     SSL_set_fd(ssl, sock);
-    SSL_set_tlsext_host_name(ssl, ip);
-    SSL_set1_host(ssl, ip);
+    SSL_set_tlsext_host_name(ssl, peer.ip.c_str());
+    SSL_set1_host(ssl, peer.ip.c_str());
 
-    if (SSL_connect(ssl) <= 0) {
-        ERR_print_errors_fp(stderr);
-        return;
-    }
+    std::string readableAddrStr = peer.ip + ":" + std::to_string(peer.port);
 
-    std::cout << "SSL connection to server successful" << std::endl;
-
-    // Add connection to map
-    {
-        std::unique_lock lock(connectionsMutex);
-        connections.emplace(serverIp, ssl);
-    }
-
-    /* Loop to send input from keyboard */
     while (true) {
-        auto [sendData, out] = zpp::bits::data_out();
-        std::string input;
-        std::getline(std::cin, input);
-        diskTeePayload sendPayload = { .data = input };
-        auto serializeResult = out(sendPayload);
-        if (failure(serializeResult)) {
-            std::cerr << "Unable to serialize payload, error: " << errorMessage(serializeResult) << std::endl;
-            continue;
+        // code for connection is in a loop so we automatically attempt to reconnect
+        while (connect(sock, (struct sockaddr*) &serverAddr, sizeof(serverAddr)) != 0) {
+            std::cout << "Unable to TCP connect to server " << peer.ip << ", retrying in " << CONNECTION_RETRY_TIMEOUT_SEC << "s..." << std::endl;
+            std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_TIMEOUT_SEC));
         }
-        
-        /* Send it to the server */
-        int result;
-        if ((result = SSL_write(ssl, sendData.data(), sendData.size())) <= 0) {
-            printf("Server closed connection on SSL_write\n");
+        std::cout << "TCP connection to server successful" << std::endl;
+
+        if (SSL_connect(ssl) <= 0) {
             ERR_print_errors_fp(stderr);
-            break;
+            return;
+        }
+        std::cout << "SSL connection to server successful" << std::endl;
+
+        // Add connection to map
+        {
+            std::unique_lock lock(connectionsMutex);
+            connections.emplace(readableAddrStr, ssl);
         }
 
-        /* Wait for the echo */
-        char rxbuf[READ_BUFFER_SIZE];
-        int rxlen = SSL_read(ssl, rxbuf, READ_BUFFER_SIZE);
-        if (rxlen <= 0) {
-            printf("Server closed connection on SSL_read\n");
-            ERR_print_errors_fp(stderr);
-            break;
-        } else {
-            /* Show it */
-            zpp::bits::in in(rxbuf);
-            diskTeePayload recvPayload;
-            auto deserializeResult = in(recvPayload);
-            if (failure(deserializeResult)) {
-                std::cerr << "Unable to deserialize payload, error: " << errorMessage(deserializeResult) << std::endl;
-                continue;
+        /* Loop to send input from keyboard */
+        char readBuffer[READ_BUFFER_SIZE];
+        while (true) {
+            std::string input;
+            std::getline(std::cin, input);
+            diskTeePayload sendPayload = { .data = input };
+
+            try {
+                send(sendPayload, ssl);
+
+                /* Wait for the echo */
+                diskTeePayload recvPayload = recv<diskTeePayload>(readBuffer, ssl);
+                std::cout << "Received: " << recvPayload.data << std::endl;
             }
-            
-            std::cout << "Received: " << recvPayload.data << std::endl;
+            catch (const std::exception& e) {
+                std::cerr << e.what() << std::endl;
+                break; // break to outer while loop to reconnect
+            }
         }
     }
 
@@ -184,7 +170,7 @@ void TLS::connectToServer(const std::string serverIp, const sockaddr_in serverAd
     // Remove the connection from the map
     {
         std::unique_lock lock(connectionsMutex);
-        connections.erase(serverIp);
+        connections.erase(readableAddrStr);
     }
 
     SSL_shutdown(ssl);
@@ -193,50 +179,25 @@ void TLS::connectToServer(const std::string serverIp, const sockaddr_in serverAd
     SSL_CTX_free(ctx);
 }
 
-void TLS::threadListen(const std::string senderIp, const sockaddr_in senderAddr, SSL* sender) {
-    while (true) {
-        int readLen;
-        char readBuffer[READ_BUFFER_SIZE];
+void TLS::threadListen(const std::string senderReadableAddr, const sockaddr_in senderAddr, SSL* sender) {
+    char readBuffer[READ_BUFFER_SIZE];
+    try {
+        while (true) {
+            diskTeePayload recvPayload = recv<diskTeePayload>(readBuffer, sender);
+            std::cout << "Received: " << recvPayload.data << std::endl;
 
-        if ((readLen = SSL_read(sender, readBuffer, READ_BUFFER_SIZE)) <= 0) {
-            if (readLen == 0) {
-                printf("Client closed connection on SSL_read\n");
-            } else {
-                printf("SSL_read returned %d\n", readLen);
-            }
-            ERR_print_errors_fp(stderr);
-            break;
+            /* Echo it back */
+            send(recvPayload, sender);
         }
-        
-        zpp::bits::in in(readBuffer);
-        diskTeePayload recvPayload;
-        auto deserializeResult = in(recvPayload);
-        if (failure(deserializeResult)) {
-            std::cerr << "Unable to deserialize payload, error: " << errorMessage(deserializeResult) << std::endl;
-            continue;
-        }
-
-        std::cout << "Received: " << recvPayload.data << std::endl;
-
-        /* Echo it back */
-        auto [sendData, out] = zpp::bits::data_out();
-        auto serializeResult = out(recvPayload);
-        if (failure(serializeResult)) {
-            std::cerr << "Unable to serialize payload, error: " << errorMessage(serializeResult) << std::endl;
-            continue;
-        }
-        
-        if (SSL_write(sender, sendData.data(), sendData.size()) <= 0) {
-            printf("Client closed connection on SSL_write\n");
-            ERR_print_errors_fp(stderr);
-            break;
-        }
+    }
+    catch (const std::exception& e) { // on exception, close connection
+        std::cerr << e.what() << std::endl;
     }
 
     // Remove the connection from the map
     {
         std::unique_lock lock(connectionsMutex);
-        connections.erase(senderIp);
+        connections.erase(senderReadableAddr);
     }
     
     // SSL shutdown, close socket
@@ -247,63 +208,100 @@ void TLS::threadListen(const std::string senderIp, const sockaddr_in senderAddr,
 
 template <class T>
 void TLS::broadcastToPeers(const T& payload) {
-    auto sendData = serialize(payload);
-
     std::shared_lock lock(connectionsMutex);
-    for (const auto& [name, ssl] : connections) {
-        if (SSL_write(ssl, sendData.data(), sendData.size()) <= 0) {
-            std::cerr << "Tried to write to broken peer" << std::endl;
-            ERR_print_errors_fp(stderr);
-            continue;
-        }
-    }
+    for (const auto& [name, ssl] : connections)
+        send(payload, ssl);
 }
 
 template <class T>
 void TLS::sendToClient(const T& payload) {
-    auto sendData = serialize(payload);
-
     std::shared_lock lock(connectionsMutex);
-    if (SSL_write(client, sendData.data(), sendData.size()) <= 0) {
-        std::cerr << "Tried to write to broken client" << std::endl;
-        ERR_print_errors_fp(stderr);
-    }
+    send(payload, client);
 }
 
 void TLS::loadOwnCertificates(SSL_CTX *ctx) {
     /* Set the key and cert */
-    if (SSL_CTX_use_certificate_file(ctx, (netConf.names[myID] + "_cert.pem").c_str(), SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_certificate_file(ctx, (netConf[myID].name + "_cert.pem").c_str(), SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, (netConf.names[myID] + "_key.pem").c_str(), SSL_FILETYPE_PEM) <= 0 ) {
+    if (SSL_CTX_use_PrivateKey_file(ctx, (netConf[myID].name + "_key.pem").c_str(), SSL_FILETYPE_PEM) <= 0 ) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
 }
 
 void TLS::loadAcceptableCertificates(SSL_CTX *ctx) {
-    for (const std::string& name : netConf.names) {
-        SSL_CTX_load_verify_locations(ctx, (name + "_cert.pem").c_str(), NULL);
+    for (const networkConfig& peer : netConf) {
+        SSL_CTX_load_verify_locations(ctx, (peer.name + "_cert.pem").c_str(), NULL);
     }
 }
 
-std::string TLS::ipFromSockAddr(const sockaddr_in& addr) {
+std::string TLS::readableAddr(const sockaddr_in& addr) {
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(addr.sin_addr), ip, INET_ADDRSTRLEN);
     return std::string(ip) + ":" + std::to_string(ntohs(addr.sin_port));
 }
 
 template <class T>
-std::vector<std::byte> TLS::serialize(const T& payload) {
+void TLS::send(const T& payload, SSL* dest) {
     auto [sendData, out] = zpp::bits::data_out();
     auto serializeResult = out(payload);
-    if (failure(serializeResult)) {
+    if (zpp::bits::failure(serializeResult)) {
         std::cerr << "Unable to serialize payload, error: " << errorMessage(serializeResult) << std::endl;
-        return {};
+        return;
     }
-    return sendData;
+
+    // 1. Send the size of the data
+    int dataSize = sendData.size();
+    if (SSL_write(dest, &dataSize, sizeof(dataSize)) <= 0)
+        throw std::runtime_error("Connection closed on SSL_write");
+    // 2. Send the data
+    if (SSL_write(dest, sendData.data(), dataSize) <= 0)
+        throw std::runtime_error("Connection closed on SSL_write");
+}
+
+template <class T>
+T TLS::recv(std::span<char> buffer, SSL* src) {
+    int readLen;
+    int dataSize;
+
+    // 1. Read the size of the data
+    readLen = SSL_read(src, &dataSize, sizeof(dataSize));
+    if (readLen <= 0)
+        throw std::runtime_error("Connection closed on SSL_read");
+    // 2. Read the data.
+    int readSoFar = 0;
+    // Check whether we can use the existing buffer to read
+    bool needNewBuffer = dataSize > buffer.size();
+    std::span<char> actualBuffer;
+    std::unique_ptr<char[]> biggerBuffer; // use a unique pointer to store larger buffer so it gets freed if we exit by throwing an exception
+    if (needNewBuffer) {
+        biggerBuffer = std::make_unique<char[]>(dataSize);
+        actualBuffer = {biggerBuffer.get(), dataSize};
+    }   
+    else
+        actualBuffer = buffer;
+    // Keep reading until everything has been received.
+    while (readSoFar < dataSize) {
+        readLen = SSL_read(src, actualBuffer.data() + readSoFar, dataSize - readSoFar);
+        if (readLen <= 0)
+            throw std::runtime_error("Connection closed on SSL_read");
+        readSoFar += readLen;
+    }
+    
+    zpp::bits::in in(actualBuffer);
+    T recvPayload;
+    auto deserializeResult = in(recvPayload);
+    if (zpp::bits::failure(deserializeResult))
+        throw std::runtime_error("Unable to deserialize payload, error: " + errorMessage(deserializeResult));
+
+    // Free memory or reset bits in buffer
+    if (!needNewBuffer)
+        memset(buffer.data(), 0, dataSize);
+
+    return recvPayload;
 }
 
 /**
