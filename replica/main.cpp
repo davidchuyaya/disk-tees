@@ -1,8 +1,8 @@
 #include <iostream>
 #include <chrono>
 #include <unistd.h>
-#include "tls.hpp"
-#include "network_config.hpp"
+#include "../shared/tls.hpp"
+#include "../shared/network_config.hpp"
 
 struct config {
     int id;

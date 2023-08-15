@@ -9,7 +9,8 @@ cmake .
 make
 ```
 
-## Launching in Azure
+
+## Creating certificates in Azure
 ### Untrusted
 Execute the following on your local computer:
 ```bash
@@ -26,6 +27,28 @@ Execute the following on your local computer:
 ```bash
 cloud_scripts/cleanup_untrusted.sh
 ```
+
+## Running the replicas
+To run `replica/disk_tees`, execute the following;
+```bash
+replica/disk_tees -i <id>
+```
+Note that `<id>` must match some ID specified in `network.json`.
+
+
+## Running the client
+To run `client/tee_fuse`, execute the following:
+```bash
+client/tee_fuse <mountpoint>
+```
+`<mountpoint>` is the directory where the filesystem will be mounted.
+To see all the options, execute `client/tee_fuse -h`. For example, `-f` is used to run the filesystem in the foreground, which can be helpful for debugging and analyzing.
+
+When you're done running the system and want to unmount, execute the following:
+```bash
+sudo umount <mountpoint>
+```
+
 
 ## Libraries
 This project makes use of the following C++ libraries:
