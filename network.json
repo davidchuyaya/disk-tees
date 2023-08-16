@@ -2,13 +2,17 @@
     {
         "name": "server",
         "ip": "127.0.0.1",
-        "port": 4433,
+        "replicaPort": 4433,
+        "clientPort": 5433,
+        "ccfPort": 6433,
         "id": 0
     },
     {
         "name": "client",
         "ip": "127.0.0.1",
-        "port": 4434,
+        "replicaPort": 4434,
+        "clientPort": 5434,
+        "ccfPort": 6434,
         "id": 1
     }
 ]

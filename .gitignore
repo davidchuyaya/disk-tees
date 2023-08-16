@@ -48,3 +48,6 @@ CPackConfig.cmake
 CPackSourceConfig.cmake
 _deps
 build
+
+# Keys
+*.pem

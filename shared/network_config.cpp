@@ -4,32 +4,27 @@
 using json = nlohmann::json;
 #include "network_config.hpp"
 
-/**
- * Expected JSON format:
- * [
- *   {
- *     "ip": "127.0.0.1",
- *     "port": 4433,
- *     "name": "disk_tee0", // Certificate should be disk_tee0.pem
- *     "id": 0 // 0-indexed
- *   }
- * ]
-*/
-std::vector<networkConfig> readNetworkConfig(const std::string& file) {
+networkConfig readNetworkConfig(const std::string& file) {
     std::ifstream f(file);
     json data = json::parse(f);
     
-    std::vector<networkConfig> out;
-    out.reserve(data.size());
+    networkConfig out;
 
     for (auto& e : data) {
         int id = e["id"];
-        networkConfig conf = {
+        peer addr = {
             .ip = e["ip"],
-            .port = e["port"],
             .name = e["name"]
         };
-        out.insert(out.begin() + id, conf);
+        peer replicaAddr = addr;
+        replicaAddr.port = e["replicaPort"];
+        out.replicas.insert(out.replicas.begin() + id, replicaAddr);
+        peer clientAddr = addr;
+        clientAddr.port = e["clientPort"];
+        out.clients.insert(out.clients.begin() + id, clientAddr);
+        peer ccfAddr = addr;
+        ccfAddr.port = e["ccfPort"];
+        out.ccfNodes.insert(out.ccfNodes.begin() + id, ccfAddr);
     }
 
     return out;

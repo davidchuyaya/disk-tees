@@ -3,10 +3,16 @@
 #include <string>
 #include <vector>
 
-struct networkConfig {
+struct peer {
     std::string ip;
     int port;
     std::string name;
+};
+
+struct networkConfig {
+    std::vector<peer> ccfNodes;
+    std::vector<peer> replicas;
+    std::vector<peer> clients;
 };
 
 /**
@@ -14,10 +20,12 @@ struct networkConfig {
  * [
  *   {
  *     "ip": "127.0.0.1",
- *     "port": 4433,
+ *     "replicaPort": 4433,
+ *     "clientPort": 5433,
+ *     "ccfPort": 6433,
  *     "name": "disk_tee0", // Certificate should be disk_tee0.pem
  *     "id": 0 // 0-indexed
  *   }
  * ]
 */
-std::vector<networkConfig> readNetworkConfig(const std::string& file);
+networkConfig readNetworkConfig(const std::string& file);

@@ -2,6 +2,7 @@
 #include <chrono>
 #include <unistd.h>
 #include "../shared/tls.hpp"
+#include "../shared/tls.cpp"
 #include "../shared/network_config.hpp"
 
 struct config {
@@ -50,15 +51,18 @@ config parseArgs(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     config conf = parseArgs(argc, argv);
-    std::vector<networkConfig> netConf = readNetworkConfig("network.json");
+    networkConfig netConf = readNetworkConfig("network.json");
 
-    TLS tls(conf.id, netConf, [](clientInPayload payload) { // TODO: Replace
-        std::cout << "Received message from client" << std::endl;
-    }, [](diskTeePayload payload) {
-        std::cout << "Received message from disk tee" << std::endl;
+    TLS<diskTeePayload, diskTeePayload> replicaTLS(conf.id, netConf.replicas, [](diskTeePayload payload, SSL* sender) {
+        std::cout << "Received message from client: " << payload.data << std::endl;
     });
 
-    
+    while (true) {
+        std::string input;
+        std::getline(std::cin, input);
+        diskTeePayload sendPayload = { .data = input };
+        replicaTLS.broadcast(sendPayload);
+    }
 
     return 0;
 }

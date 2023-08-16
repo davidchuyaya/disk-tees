@@ -28,35 +28,28 @@ struct diskTeePayload {
     std::string data;
 };
 
+template <class RecvMsg, class SendMsg>
 class TLS {
     public:
-        TLS(const int myID, const std::vector<networkConfig> netConf,
-            const std::function<void(clientInPayload)> onClientMsg, 
-            const std::function<void(diskTeePayload)> onDiskTeeMsg);
-        void startServer();
-        void connectToServer(const networkConfig& peer);
-        template <class T>
-        void broadcastToPeers(const T& payload); 
-        template <class T>
-        void sendToClient(const T& payload); 
+        TLS(const int myID, const std::vector<peer> netConf, const std::function<void(RecvMsg, SSL*)> onRecv);
+        void broadcast(const SendMsg& payload);
+        void send(const SendMsg& payload, const std::string& dest);
+        void send(const SendMsg& payload, SSL* dest);
 
     private:
         const int myID;
-        const std::vector<networkConfig> netConf;
-        const std::function<void(clientInPayload)> onClientMsg;
-        const std::function<void(diskTeePayload)> onDiskTeeMsg;
+        const std::vector<peer> netConf;
+        const std::function<void(RecvMsg, SSL*)> onRecv;
         
         std::shared_mutex connectionsMutex;
-        SSL* client;
         std::map<std::string, SSL*> connections;
 
+        void startServer();
+        void connectToServer(const peer& addr);
         void threadListen(const std::string senderReadableAddr, const sockaddr_in senderAddr, SSL* sender);
         void loadOwnCertificates(SSL_CTX *ctx);
         void loadAcceptableCertificates(SSL_CTX *ctx);
         std::string readableAddr(const sockaddr_in& addr); // Format: ip::port
-        template <class T>
-        void send(const T& payload, SSL* dest);
-        template <class T>
-        T recv(std::span<char> buffer, SSL* src); // Will allocate a new buffer if provided buffer doesn't fit
+        RecvMsg recv(std::span<char> buffer, SSL* src); // Will allocate a new buffer if provided buffer doesn't fit
         std::string errorMessage(const std::errc errorCode);
 };

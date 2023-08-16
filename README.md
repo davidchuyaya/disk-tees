@@ -9,6 +9,11 @@ cmake .
 make
 ```
 
+If you want to test locally, you'd need to create the necessary keys and certificates. Execute:
+```bash
+./create_cert.sh
+```
+
 
 ## Creating certificates in Azure
 ### Untrusted
