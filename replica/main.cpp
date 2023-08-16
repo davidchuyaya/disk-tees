@@ -1,9 +1,12 @@
 #include <iostream>
 #include <chrono>
+#include <variant>
 #include <unistd.h>
 #include "../shared/tls.hpp"
 #include "../shared/tls.cpp"
 #include "../shared/network_config.hpp"
+#include "../shared/fuse_messages.hpp"
+#include "replica_fuse.hpp"
 
 struct config {
     int id;
@@ -49,20 +52,25 @@ config parseArgs(int argc, char* argv[]) {
     return conf;
 }
 
+template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
 int main(int argc, char* argv[]) {
     config conf = parseArgs(argc, argv);
     networkConfig netConf = readNetworkConfig("network.json");
 
-    TLS<diskTeePayload, diskTeePayload> replicaTLS(conf.id, netConf.replicas, [](diskTeePayload payload, SSL* sender) {
-        std::cout << "Received message from client: " << payload.data << std::endl;
+    ReplicaFuse replicaFuse;
+    TLS<clientMsg, diskTeePayload> replicaTLS(conf.id, netConf.replicas, [&](clientMsg payload, SSL* sender) {
+        // Essentially a switch statement matching the possible types of messages
+        std::visit(replicaFuse, payload.params);
     });
 
-    while (true) {
-        std::string input;
-        std::getline(std::cin, input);
-        diskTeePayload sendPayload = { .data = input };
-        replicaTLS.broadcast(sendPayload);
-    }
+    while (true) {}
+
+    // while (true) {
+    //     std::string input;
+    //     std::getline(std::cin, input);
+    //     diskTeePayload sendPayload = { .data = input };
+    //     replicaTLS.broadcast(sendPayload);
+    // }
 
     return 0;
 }

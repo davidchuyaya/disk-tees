@@ -9,20 +9,6 @@
 #include <span>
 #include "network_config.hpp"
 
-struct clientInPayload {
-    // TODO: Writes from the client
-};
-
-const int MSG_TYPE_WRITE_ACK = 0;
-const int MSG_TYPE_FSYNC_ACK = 1;
-const int MSG_TYPE_RECOVERY = 2;
-struct clientOutPayload {
-    int messageType;
-    int seq;
-    int maxContSeq;
-    // TODO: Add field to store file system nodes
-};
-
 struct diskTeePayload {
     // TODO: Message types for recovery
     std::string data;

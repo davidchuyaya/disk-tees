@@ -5,6 +5,9 @@
  * Assumes that certificates are self-signed.
 */
 
+#ifndef __TLS_CPP__
+#define __TLS_CPP__
+
 #include <stdio.h>
 #include <unistd.h>
 #include <string>
@@ -160,7 +163,6 @@ void TLS<RecvMsg, SendMsg>::connectToServer(const peer& addr) {
         }
     }
 
-    // TODO: Instead of ever releasing the socket, the client should always try to reconnect
     // Remove the connection from the map
     {
         std::unique_lock lock(connectionsMutex);
@@ -261,7 +263,6 @@ RecvMsg TLS<RecvMsg, SendMsg>::recv(std::span<char> buffer, SSL* src) {
     if (readLen <= 0)
         throw std::runtime_error("Connection closed on SSL_read");
     // 2. Read the data.
-    int readSoFar = 0;
     // Check whether we can use the existing buffer to read
     bool needNewBuffer = dataSize > buffer.size();
     std::span<char> actualBuffer;
@@ -273,6 +274,7 @@ RecvMsg TLS<RecvMsg, SendMsg>::recv(std::span<char> buffer, SSL* src) {
     else
         actualBuffer = buffer;
     // Keep reading until everything has been received.
+    int readSoFar = 0;
     while (readSoFar < dataSize) {
         readLen = SSL_read(src, actualBuffer.data() + readSoFar, dataSize - readSoFar);
         if (readLen <= 0)
@@ -319,3 +321,5 @@ std::string TLS<RecvMsg, SendMsg>::errorMessage(const std::errc errorCode) {
             return "unknown error";
     }
 }
+
+#endif

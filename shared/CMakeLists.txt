@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.14)  # CMake version check
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++2a")
 
-add_library(shared tls.cpp tls.hpp network_config.cpp network_config.hpp)
+add_library(shared tls.cpp tls.hpp network_config.cpp network_config.hpp fuse_messages.hpp)
 
 # Use OpenSSL for hashing, encryption, random number generation, and TLS networking
 find_package(OpenSSL REQUIRED)
@@ -21,4 +21,10 @@ FetchContent_MakeAvailable(json zpp)
 add_library(zpp INTERFACE)
 target_include_directories(zpp INTERFACE ${zpp_SOURCE_DIR})
 
-target_link_libraries(shared OpenSSL::Crypto OpenSSL::SSL Threads::Threads nlohmann_json::nlohmann_json zpp)
+# FUSE library
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(FUSE REQUIRED fuse3)
+target_include_directories(shared PUBLIC ${FUSE_INCLUDE_DIRS})
+target_link_directories(shared PUBLIC ${FUSE_LIBRARY_DIRS})
+
+target_link_libraries(shared OpenSSL::Crypto OpenSSL::SSL Threads::Threads nlohmann_json::nlohmann_json zpp ${FUSE_LIBRARIES})

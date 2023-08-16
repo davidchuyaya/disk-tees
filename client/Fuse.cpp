@@ -1,5 +1,8 @@
 //==================================================================
 /**
+ *  Mostly copied from https://github.com/jachappell/Fusepp/tree/master.
+ *  Couldn't figure out how to import with FetchContent.
+ * 
  *  FuseApp -- A simple C++ wrapper for the FUSE filesystem
  *
  *  Copyright (C) 2017 by James A. Chappell (rlrrlrll@gmail.com)
@@ -23,7 +26,7 @@
  *  OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "Fuse.h"
+#include "Fuse.hpp"
 
 template<class T> Fusepp::t_getattr Fusepp::Fuse<T>::client_getattr = nullptr;
 template<class T> Fusepp::t_readlink Fusepp::Fuse<T>::client_readlink = nullptr;
