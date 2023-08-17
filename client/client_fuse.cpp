@@ -90,6 +90,14 @@ int ClientFuse::client_unlink(const char* path) {
     if (res == -1)
         return -errno;
 
+	// Start networking
+	unlinkParams msg {
+		.seq = written++,
+		.r = r,
+		.path = std::string(path)
+	};
+	replicaTLS->broadcast(msg);
+	// Finish networking
     return 0;
 }
 
@@ -104,13 +112,11 @@ int ClientFuse::client_truncate(const char* path, off_t size, fuse_file_info *fi
         return -errno;
 
 	// Start networking
-	truncateParams params {
+	truncateParams msg {
+		.seq = written++,
+		.r = r,
 		.size = size,
 		.fi = make_lite(fi)
-	};
-	clientMsg msg {
-		.seq = written++,
-		.params = params
 	};
 	replicaTLS->broadcast(msg);
 	// Finish networking
@@ -126,14 +132,12 @@ int ClientFuse::client_create(const char *path, mode_t mode, fuse_file_info *fi)
 	fi->fh = fd;
 
 	// Start networking
-	createParams params {
+	createParams msg {
+		.seq = written++,
+		.r = r,
 		.path = std::string(path),
 		.mode = mode,
 		.fi = make_lite(fi)
-	};
-	clientMsg msg {
-		.seq = written++,
-		.params = params
 	};
 	replicaTLS->broadcast(msg);
 	// Finish networking
@@ -157,14 +161,12 @@ int ClientFuse::client_write_buf(const char *path, fuse_bufvec *buf, off_t offse
 	std::vector<char> mem;
 	mem.insert(mem.end(), bufStart, bufStart + bufSize - buf->off);
 	// 2. Send mem
-	writeBufParams params {
+	writeBufParams msg {
+		.seq = written++,
+		.r = r,
 		.offset = offset,
 		.buf = mem,
 		.fi = make_lite(fi)
-	};
-	clientMsg msg {
-		.seq = written++,
-		.params = params
 	};
 	replicaTLS->broadcast(msg);
 	// Finish networking
@@ -184,12 +186,10 @@ int ClientFuse::client_release(const char *path, fuse_file_info *fi) {
     close(fi->fh);
 
 	// Start networking
-	releaseParams params {
-		.fi = make_lite(fi)
-	};
-	clientMsg msg {
+	releaseParams msg {
 		.seq = written++,
-		.params = params
+		.r = r,
+		.fi = make_lite(fi)
 	};
 	replicaTLS->broadcast(msg);
 	// End networking
@@ -201,19 +201,17 @@ int ClientFuse::client_fsync(const char *path, int isdatasync, fuse_file_info *f
     int res;
 	
     if (isdatasync)
-        res = fdatasync(fi->fh);
+        res = fdatasync(fi->fh); //TODO: See if there are any fdatasyncs and send the int to replica_fuse.cpp if so
     else
         res = fsync(fi->fh);
     if (res == -1)
         return -errno;
 
 	// Start networking
-	fsyncParams params {
+	fsyncParams msg {
+		.seq = written, // Note: Fsync does not increase the written count
+		.r = r,
 		.fi = make_lite(fi)
-	};
-	clientMsg msg {
-		.seq = written++,
-		.params = params
 	};
 	replicaTLS->broadcast(msg);
 	// End networking

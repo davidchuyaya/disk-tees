@@ -52,15 +52,17 @@ config parseArgs(int argc, char* argv[]) {
     return conf;
 }
 
-template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
 int main(int argc, char* argv[]) {
     config conf = parseArgs(argc, argv);
     networkConfig netConf = readNetworkConfig("network.json");
 
+    // TODO: If we expect 1 client at all times, then we don't need to use mutexes in ReplicaFuse.
+    // We have to enforce that there is only ever 1 client by limiting the number of clients that can connect
     ReplicaFuse replicaFuse;
-    TLS<clientMsg, diskTeePayload> replicaTLS(conf.id, netConf.replicas, [&](clientMsg payload, SSL* sender) {
+    TLS<clientMsg, diskTeePayload> replicaTLS(conf.id, netConf.replicas, std::filesystem::current_path().string(),
+        [&](clientMsg payload, SSL* sender) {
         // Essentially a switch statement matching the possible types of messages
-        std::visit(replicaFuse, payload.params);
+        std::visit(replicaFuse, payload);
     });
 
     while (true) {}

@@ -9,6 +9,28 @@
 #endif
 #include <fuse.h>
 
+struct round {
+    int roundNum = 0;
+    int clientId = 0;
+    int configNum = 0;
+
+    bool operator ==(const round& rhs) const {
+        return roundNum == rhs.roundNum && clientId == rhs.clientId && configNum == rhs.configNum;
+    }
+
+    bool operator <(const round& rhs) const {
+        bool roundNumLess = roundNum < rhs.roundNum;
+        bool idLess = roundNum == rhs.roundNum && clientId < rhs.clientId;
+        bool configLess = roundNum == rhs.roundNum && clientId == rhs.clientId && configNum < rhs.configNum;
+        return roundNumLess || idLess || configLess;
+    }
+};
+
+// inline keyword: See https://stackoverflow.com/a/12802613/4028758
+inline std::ostream& operator <<(std::ostream& out, const round& r) {
+    return out << "(" << r.roundNum << "," << r.clientId << "," << r.configNum << ")";
+}
+
 /**
  * Modified structs from fuse_common.h to simplify data, remove incompatibilities, and remove pointers
 */
@@ -23,39 +45,51 @@ struct fuse_file_info_lite {
 	uint64_t fh;
 };
 
+struct unlinkParams {
+    int seq;
+    round r;
+    std::string path;
+};
+
 struct truncateParams {
+    int seq;
+    round r;
     off_t size;
     fuse_file_info_lite fi;
 };
 
 struct createParams {
+    int seq;
+    round r;
     std::string path;
     mode_t mode;
     fuse_file_info_lite fi;
 };
 
 struct writeBufParams {
+    int seq;
+    round r;
     off_t offset;
     std::vector<char> buf; // Use a vector so the receiver can resize its buffer based on how much is sent.
     fuse_file_info_lite fi;
 };
 
 struct releaseParams {
+    int seq;
+    round r;
     fuse_file_info_lite fi;
 };
 
 struct fsyncParams {
+    int seq;
+    round r;
     fuse_file_info_lite fi;
 };
 
 // Add to variant as the number of variants increase
-typedef std::variant<truncateParams,
+typedef std::variant<unlinkParams,
+                    truncateParams,
                     createParams, 
                     writeBufParams, 
                     releaseParams, 
-                    fsyncParams> fuseMethodParams;
-
-struct clientMsg {
-    int seq;
-    fuseMethodParams params;
-};
+                    fsyncParams> clientMsg;

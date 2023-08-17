@@ -17,7 +17,7 @@ struct diskTeePayload {
 template <class RecvMsg, class SendMsg>
 class TLS {
     public:
-        TLS(const int myID, const std::vector<peer> netConf, const std::function<void(RecvMsg, SSL*)> onRecv);
+        TLS(const int myID, const std::vector<peer> netConf, const std::string path, const std::function<void(RecvMsg, SSL*)> onRecv);
         void broadcast(const SendMsg& payload);
         void send(const SendMsg& payload, const std::string& dest);
         void send(const SendMsg& payload, SSL* dest);
@@ -25,6 +25,7 @@ class TLS {
     private:
         const int myID;
         const std::vector<peer> netConf;
+        const std::string path;
         const std::function<void(RecvMsg, SSL*)> onRecv;
         
         std::shared_mutex connectionsMutex;

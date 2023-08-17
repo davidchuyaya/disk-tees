@@ -55,6 +55,7 @@ private:
     // inline static: See https://stackoverflow.com/a/62915890/4028758
     inline static TLS<diskTeePayload, clientMsg> *replicaTLS;
     inline static int written;
+    inline static round r;
 
     static fuse_file_info_lite make_lite(fuse_file_info *fi);
 };

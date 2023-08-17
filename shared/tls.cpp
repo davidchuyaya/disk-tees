@@ -21,6 +21,7 @@
 #include <mutex>
 #include <memory>
 #include <stdexcept>
+#include <filesystem>
 #include "zpp_bits.h"
 #include "tls.hpp"
 
@@ -28,12 +29,10 @@ static const int CONNECTION_RETRY_TIMEOUT_SEC = 5;
 static const int READ_BUFFER_SIZE = 8192;
 
 template <class RecvMsg, class SendMsg>
-TLS<RecvMsg, SendMsg>::TLS(const int myID, const std::vector<peer> netConf, const std::function<void(RecvMsg, SSL*)> onRecv) :
-            myID(myID), netConf(netConf), onRecv(onRecv) {
-    // Connect to peers asynchronously
-    for (int i = 0; i < netConf.size(); i++) {
-        if (i == myID)
-            continue;
+TLS<RecvMsg, SendMsg>::TLS(const int myID, const std::vector<peer> netConf, const std::string path, const std::function<void(RecvMsg, SSL*)> onRecv) :
+            myID(myID), netConf(netConf), path(path), onRecv(onRecv) {
+    // Connect to peers asynchronously, with lower-numbered peers connecting to higher-numbered peers
+    for (int i = myID + 1; i < netConf.size(); i++) {
         const peer& addr = netConf[i];
         std::thread(&TLS::connectToServer, this, addr).detach();
     }
@@ -203,19 +202,23 @@ void TLS<RecvMsg, SendMsg>::threadListen(const std::string senderReadableAddr, c
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::broadcast(const SendMsg& payload) {
     std::shared_lock lock(connectionsMutex);
-    for (const auto& [name, ssl] : connections)
-        send(payload, ssl);
+    for (const auto& [name, ssl] : connections) {
+        try {
+            send(payload, ssl);
+        }
+        catch (const std::exception& e) {} //TODO: What to do when broadcast fails?
+    }
 }
 
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::loadOwnCertificates(SSL_CTX *ctx) {
     /* Set the key and cert */
-    if (SSL_CTX_use_certificate_file(ctx, (netConf[myID].name + "_cert.pem").c_str(), SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_certificate_file(ctx, (path + "/" + netConf[myID].name + "_cert.pem").c_str(), SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, (netConf[myID].name + "_key.pem").c_str(), SSL_FILETYPE_PEM) <= 0 ) {
+    if (SSL_CTX_use_PrivateKey_file(ctx, (path + "/" + netConf[myID].name + "_key.pem").c_str(), SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
@@ -224,7 +227,7 @@ void TLS<RecvMsg, SendMsg>::loadOwnCertificates(SSL_CTX *ctx) {
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::loadAcceptableCertificates(SSL_CTX *ctx) {
     for (const peer& addr : netConf) {
-        SSL_CTX_load_verify_locations(ctx, (addr.name + "_cert.pem").c_str(), NULL);
+        SSL_CTX_load_verify_locations(ctx, (path + "/" + addr.name + "_cert.pem").c_str(), NULL);
     }
 }
 
