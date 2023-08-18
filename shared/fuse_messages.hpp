@@ -45,17 +45,92 @@ struct fuse_file_info_lite {
 	uint64_t fh;
 };
 
+struct mknodParams {
+    int seq;
+    round r;
+    std::string path;
+    mode_t mode;
+    dev_t rdev;
+};
+
+struct mkdirParams {
+    int seq;
+    round r;
+    std::string path;
+    mode_t mode;
+};
+
+struct symlinkParams {
+    int seq;
+    round r;
+    std::string target;
+    std::string linkpath;
+};
+
 struct unlinkParams {
     int seq;
     round r;
     std::string path;
 };
 
+struct rmdirParams {
+    int seq;
+    round r;
+    std::string path;
+};
+
+struct renameParams {
+    int seq;
+    round r;
+    std::string oldpath;
+    std::string newpath;
+};
+
+struct linkParams {
+    int seq;
+    round r;
+    std::string oldpath;
+    std::string newpath;
+};
+
+// Use fi or path depending on whether hasFi is true
+struct chmodParams {
+    int seq;
+    round r;
+    std::string path;
+    mode_t mode;
+    fuse_file_info_lite fi;
+    bool hasFi;
+};
+
+// Use fi or path depending on whether hasFi is true
+struct chownParams {
+    int seq;
+    round r;
+    std::string path;
+    uid_t uid;
+    gid_t gid;
+    fuse_file_info_lite fi;
+    bool hasFi;
+};
+
 struct truncateParams {
     int seq;
     round r;
+    std::string path;
     off_t size;
     fuse_file_info_lite fi;
+    bool hasFi;
+};
+
+struct utimensParams {
+    int seq;
+    round r;
+    std::string path;
+    timespec tv0; // split tv array into 2 fields because ZPP likes it better
+    timespec tv1;
+    fuse_file_info_lite fi;
+    bool hasFi;
 };
 
 struct createParams {
@@ -63,6 +138,13 @@ struct createParams {
     round r;
     std::string path;
     mode_t mode;
+    fuse_file_info_lite fi;
+};
+
+struct openParams {
+    int seq;
+    round r;
+    std::string path;
     fuse_file_info_lite fi;
 };
 
@@ -86,10 +168,59 @@ struct fsyncParams {
     fuse_file_info_lite fi;
 };
 
+struct fallocateParams {
+    int seq;
+    round r;
+    off_t offset;
+    off_t length;
+    fuse_file_info_lite fi;
+};
+
+struct setxattrParams {
+    int seq;
+    round r;
+    std::string path;
+    std::string name;
+    std::vector<char> value;
+    int flags;
+};
+
+struct removexattrParams {
+    int seq;
+    round r;
+    std::string path;
+    std::string name;
+};
+
+struct copyFileRangeParams {
+    int seq;
+    round r;
+    fuse_file_info_lite fi_in;
+    off_t off_in;
+    fuse_file_info_lite fi_out;
+    off_t off_out;
+    size_t len;
+    int flags;
+};
+
 // Add to variant as the number of variants increase
-typedef std::variant<unlinkParams,
+typedef std::variant<mknodParams, 
+                    mkdirParams, 
+                    symlinkParams,
+                    unlinkParams,
+                    rmdirParams,
+                    renameParams,
+                    linkParams,
+                    chmodParams,
+                    chownParams,
                     truncateParams,
-                    createParams, 
-                    writeBufParams, 
-                    releaseParams, 
-                    fsyncParams> clientMsg;
+                    utimensParams,
+                    createParams,
+                    openParams,
+                    writeBufParams,
+                    releaseParams,
+                    fsyncParams,
+                    fallocateParams,
+                    setxattrParams,
+                    removexattrParams,
+                    copyFileRangeParams> clientMsg;

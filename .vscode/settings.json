@@ -106,6 +106,7 @@
         "valarray": "cpp",
         "version": "cpp",
         "__availability": "cpp",
-        "__tree": "cpp"
+        "__tree": "cpp",
+        "__mutex_base": "cpp"
     }
 }
