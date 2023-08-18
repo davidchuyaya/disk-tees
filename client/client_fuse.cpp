@@ -438,7 +438,7 @@ int ClientFuse::client_create(const char *path, mode_t mode, fuse_file_info *fi)
 		return -errno;
 
 	fi->fh = fd;
-	std::cout << "Fh " << fd << " at path " << path << std::endl;
+	// std::cout << "Fh " << fd << " at path " << path << std::endl;
 
 	#ifdef NETWORK
 	createParams msg {
@@ -461,7 +461,7 @@ int ClientFuse::client_open(const char *path, fuse_file_info *fi) {
 		return -errno;
 
 	fi->fh = fd;
-	std::cout << "Fh " << fd << " at path " << path << std::endl;
+	// std::cout << "Fh " << fd << " at path " << path << std::endl;
 
 	#ifdef NETWORK
 	openParams msg {
@@ -507,7 +507,7 @@ int ClientFuse::client_write_buf(const char *path, fuse_bufvec *buf, off_t offse
 
 int ClientFuse::client_release(const char *path, fuse_file_info *fi) {
     close(fi->fh);
-	std::cout << "Fh " << fi->fh << " released at path " << path << std::endl;
+	// std::cout << "Fh " << fi->fh << " released at path " << path << std::endl;
 
 	#ifdef NETWORK
 	releaseParams msg {

@@ -1,7 +1,11 @@
 #!/bin/bash
 echo "Cleaning up, will take a while. Feel free to exit this script."
-# Ensure the name here matches the resource group name in launch_untrusted.sh
+
+VM_NAME="disk_tee"
+RESOURCE_GROUP=${VM_NAME}_untrusted
+
 az group delete \
-  --name disk_tee_untrusted \
+  --name $RESOURCE_GROUP \
   --yes
+  
 echo "Cleanup complete."

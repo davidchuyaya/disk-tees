@@ -9,18 +9,56 @@ cmake .
 make
 ```
 
+## Running locally
+
 If you want to test locally, you'd need to create the necessary keys and certificates. Execute:
 ```bash
-./create_cert.sh
+./create_testing_cert.sh
 ```
 
+TODO: Add instructions for setting up tmpfs locally?
 
+To start the replicas, execute the following;
+```bash
+replica/disk_tees -i <id>
+```
+Note that `<id>` must match some ID specified in `network.json`, which can be edited based on the ports you'd like to expose. Documentation for `network.json` can be found in `shared/network_config.hpp`.
+
+To start the client, execute the following:
+```bash
+client/tee_fuse -f -s <mountpoint>
+```
+`-f` states that the client should run in the foreground, so we can see any error logs.
+`-s` turns on single-threaded mode, which is required for sequentially sequencing writes.
+`<mountpoint>` is the directory where the filesystem will be mounted.
+To see all the options provided by FUSE, execute `client/tee_fuse -h`.
+
+When you're done running the system, or if the system terminates unexpected, you may need to unmount by executing the following:
+```bash
+sudo umount <mountpoint>
+```
+
+## Running in Azure
+
+Execute the following:
+```bash
+./launch.sh -t <trusted_mode> -p <postgres_mode>
+```
+Documentation for each mode can be found by executing `./launch.sh`. Note that the script will not work if you are not under the "Azure Research Subs" subscription in Azure. Be sure to modify the script to use your own subscription.
+
+TODO: Launch CCF, load replica IP addresses in, then launch client with that config. Might want to break up launch.sh into multiple scripts so it's easier to debug.
+
+### Shutting down Azure
+TODO
+
+
+TODO: The following Azure sections are deprecated but still useful for me, will delete after I'm done writing scripts
 ## Creating certificates in Azure
 ### Untrusted
 Execute the following on your local computer:
 ```bash
 cloud_scripts/launch_untrusted.sh
-cloud_scripts/distribute_cert.sh #TODO Let servers send certificates to each other instead. Close SSH port so we can't steal server secrets.
+cloud_scripts/distribute_cert.sh
 ```
 
 Note that the script will not work if you are not under the "Azure Research Subs" subscription in Azure. Be sure to modify the script to use your own subscription. More details and configuration parameters can be found at the top of the script.
@@ -33,27 +71,6 @@ Execute the following on your local computer:
 cloud_scripts/cleanup_untrusted.sh
 ```
 
-## Running the replicas
-To run `replica/disk_tees`, execute the following;
-```bash
-replica/disk_tees -i <id>
-```
-Note that `<id>` must match some ID specified in `network.json`.
-
-
-## Running the client
-To run `client/tee_fuse`, execute the following:
-```bash
-client/tee_fuse <mountpoint>
-```
-`<mountpoint>` is the directory where the filesystem will be mounted.
-To see all the options, execute `client/tee_fuse -h`. For example, `-f` is used to run the filesystem in the foreground, which can be helpful for debugging and analyzing.
-
-When you're done running the system and want to unmount, execute the following:
-```bash
-sudo umount <mountpoint>
-```
-
 
 ## Libraries
 This project makes use of the following C++ libraries:
@@ -61,3 +78,5 @@ This project makes use of the following C++ libraries:
 - [OpenSSL](https://wiki.openssl.org/index.php/Main_Page) - Used for TLS encrypted connections
 - [JSON for modern C++](https://github.com/nlohmann/json#examples) - Used for reading JSON config files
 - [zpp::bits](https://github.com/eyalz800/zpp_bits) - Used for fast serializing/deserializing of CPP structs. Requires C++20
+- [libfuse](https://github.com/libfuse/libfuse) - For intercepting writes to the file system
+- [Fusepp](https://github.com/jachappell/Fusepp) - For wrapping FUSE functions in C++
