@@ -78,9 +78,6 @@ namespace Fusepp
   typedef int(*t_utimens) (const char *, const struct timespec tv[2],
                             struct fuse_file_info *fi);
   typedef int(*t_bmap) (const char *, size_t blocksize, uint64_t *idx);
-  typedef int(*t_ioctl) (const char *, int cmd, void *arg,
-                         struct fuse_file_info *, unsigned int flags,
-                         void *data);
   typedef int(*t_poll) (const char *, struct fuse_file_info *,
                         struct fuse_pollhandle *ph, unsigned *reventsp);
 	typedef int(*t_write_buf) (const char *, struct fuse_bufvec *buf, off_t off,
@@ -157,7 +154,6 @@ namespace Fusepp
       operations_.lock = T::client_lock;
       operations_.utimens = T::client_utimens;
       operations_.bmap = T::client_bmap;
-      operations_.ioctl = T::client_ioctl;
       operations_.poll = T::client_poll;
       operations_.write_buf = T::client_write_buf;
       operations_.read_buf = T::client_read_buf;
@@ -201,7 +197,6 @@ namespace Fusepp
     static t_lock client_lock;
     static t_utimens client_utimens;
     static t_bmap client_bmap;
-    static t_ioctl client_ioctl;
     static t_poll client_poll;
     static t_write_buf client_write_buf;
     static t_read_buf client_read_buf;

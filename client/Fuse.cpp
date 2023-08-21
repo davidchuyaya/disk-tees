@@ -62,7 +62,6 @@ template<class T> Fusepp::t_create Fusepp::Fuse<T>::client_create = nullptr;
 template<class T> Fusepp::t_lock Fusepp::Fuse<T>::client_lock = nullptr;
 template<class T> Fusepp::t_utimens Fusepp::Fuse<T>::client_utimens = nullptr;
 template<class T> Fusepp::t_bmap Fusepp::Fuse<T>::client_bmap = nullptr;
-template<class T> Fusepp::t_ioctl Fusepp::Fuse<T>::client_ioctl = nullptr;
 template<class T> Fusepp::t_poll Fusepp::Fuse<T>::client_poll = nullptr;
 template<class T> Fusepp::t_write_buf Fusepp::Fuse<T>::client_write_buf = nullptr;
 template<class T> Fusepp::t_read_buf Fusepp::Fuse<T>::client_read_buf = nullptr;
