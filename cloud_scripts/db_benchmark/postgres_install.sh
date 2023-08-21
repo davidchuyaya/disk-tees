@@ -2,6 +2,7 @@
 #
 # Downloading and building postgres
 #
+cd /home/azureuser
 sudo apt update
 sudo apt -y install build-essential libreadline-dev zlib1g-dev
 # Postgres 15.4 is the latest non-beta at the time of writing: https://www.postgresql.org/ftp/source/
