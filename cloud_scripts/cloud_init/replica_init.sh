@@ -2,7 +2,8 @@
 # 
 # Run the replicas' code.
 #
-git clone https://github.com/davidchuyaya/disk-tees.git /home/azureuser/disk-tees
+cd /home/azureuser
+git clone https://github.com/davidchuyaya/disk-tees.git
 cd /home/azureuser/disk-tees
 
 # Create certificates
@@ -15,4 +16,9 @@ mkdir $DIR
 # TODO: Figure out how large to make tmpfs (how many Gb)
 sudo mount -t tmpfs -o size=2G tmpfs $DIR
 
-# TODO: Make disk-tees, mount it on $DIR
+# Make disk-tees, mount it on $DIR
+cmake .
+make
+# TODO: Run in background so startup script can terminate?
+ID=0 # TODO: Assign id
+replica/disk-tees -i $ID -d $DIR

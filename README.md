@@ -9,6 +9,11 @@ cmake .
 make
 ```
 
+In order to launch any VMs, you must install the Azure CLI locally as well:
+```bash
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+```
+
 ## Running locally
 
 If you want to test locally, you'd need to create the necessary keys and certificates. Execute:
@@ -18,22 +23,27 @@ If you want to test locally, you'd need to create the necessary keys and certifi
 
 TODO: Add instructions for setting up tmpfs locally?
 
+TODO: Figure of how writes enter through the mountpoint, are sent to the replicas, and then are written to the redirect point and the replica's directory.
+
 To start the replicas, execute the following;
 ```bash
-replica/disk_tees -i <id>
+replica/disk_tees -i <id> -d <directory>
 ```
 Note that `<id>` must match some ID specified in `network.json`, which can be edited based on the ports you'd like to expose. Documentation for `network.json` can be found in `shared/network_config.hpp`.
+`<directory>` is the directory where the replica will store its data. Note that this directory must first be manually created.
 
 To start the client, execute the following:
 ```bash
-client/tee_fuse -f -s <mountpoint>
+client/tee_fuse -f -s -i <id> -r <redirect point> <mountpoint>
 ```
-`-f` states that the client should run in the foreground, so we can see any error logs.
-`-s` turns on single-threaded mode, which is required for sequentially sequencing writes.
-`<mountpoint>` is the directory where the filesystem will be mounted.
+- `-f` states that the client should run in the foreground, so we can see any error logs.
+- `-s` turns on single-threaded mode, which is required for sequentially sequencing writes.
+- `-i` is the id, as before.
+- `-r` is where the client will store the data.
+- `<mountpoint>` is the directory where the filesystem will be mounted.
 To see all the options provided by FUSE, execute `client/tee_fuse -h`.
 
-When you're done running the system, or if the system terminates unexpected, you may need to unmount by executing the following:
+When you're done running the system, or if the system terminates unexpectedly, you may need to unmount by executing the following:
 ```bash
 sudo umount <mountpoint>
 ```

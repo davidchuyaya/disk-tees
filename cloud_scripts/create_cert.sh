@@ -2,7 +2,7 @@
 #
 #  Create certificate and private key
 #
-cd /home/azureuser
+cd /home/azureuser/disk-tees
 # Get private IP address
 IP=$(hostname -I | xargs)
 openssl req -x509 -newkey rsa:4096 -keyout server_key.pem -out server_cert.pem \

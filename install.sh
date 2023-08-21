@@ -1,9 +1,6 @@
 #!/bin/bash
 sudo apt update
-sudo apt -y install cmake build-essential libssl-dev pkg-config libfuse3-dev
-
-# Install Azure CLI.
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+sudo apt -y install cmake build-essential libssl-dev pkg-config libfuse3-dev fuse3
 
 # Install a newer GCC to use C++20 features.
 sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
