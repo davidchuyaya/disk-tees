@@ -1,6 +1,6 @@
 #!/bin/bash
 sudo apt update
-sudo apt -y install cmake build-essential libssl-dev
+sudo apt -y install cmake build-essential libssl-dev pkg-config libfuse3-dev
 
 # Install Azure CLI.
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
