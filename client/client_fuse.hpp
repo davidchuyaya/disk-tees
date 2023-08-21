@@ -11,7 +11,7 @@
 class ClientFuse : public Fusepp::Fuse<ClientFuse>
 {
 public:
-    ClientFuse(TLS<diskTeePayload, clientMsg> *replicaTLS);
+    ClientFuse(TLS<diskTeePayload, clientMsg> *replicaTLS, const std::string& redirectPoint);
 
     static void *client_init(fuse_conn_info *conn, fuse_config *cfg);
     static int client_getattr(const char *path, struct stat *stbuf, fuse_file_info *fi);
@@ -61,6 +61,8 @@ private:
     inline static TLS<diskTeePayload, clientMsg> *replicaTLS;
     inline static int written;
     inline static round r;
+    // Directory to redirect writes to. Since we're passing through all disk operations, this is necessary to prevent retriggering FUSE in the same directory
+    inline static std::string redirectPoint;
 
     static fuse_file_info_lite make_lite(fuse_file_info *fi);
 };

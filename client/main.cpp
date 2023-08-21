@@ -6,12 +6,14 @@
 
 static struct config {
     int id;
+    const char* redirectPoint;
 } config;
 
 // Fuse parsing logic from: https://github.com/libfuse/libfuse/blob/master/example/hello.c
 #define OPTION(t, p) { t, offsetof(struct config, p), 1 }
 static const struct fuse_opt config_spec[] = {
 	OPTION("-i %d", id),
+    OPTION("-r %s", redirectPoint),
 	FUSE_OPT_END
 };
 
@@ -21,7 +23,7 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
     
     // For some reason, the client's current path changes to root between the reading of network config and TLS, so we pass it to TLS
-    const std::string& path = std::filesystem::current_path().string();
+    std::string path = std::filesystem::current_path().string();
 
     networkConfig netConf = readNetworkConfig("network.json");
 
@@ -30,6 +32,6 @@ int main(int argc, char* argv[]) {
         std::cout << "Received message from replica: " << payload.data << std::endl;
     });
 
-    ClientFuse fuse(&replicaTLS);
+    ClientFuse fuse(&replicaTLS, config.redirectPoint);
     return fuse.run(args.argc, args.argv);
 }

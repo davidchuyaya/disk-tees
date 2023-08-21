@@ -8,7 +8,7 @@
 // If defined, will write files to the directory specified below. Used for testing locally.
 #define CUSTOM_DIR
 #ifdef CUSTOM_DIR
-#define PREPEND_PATH(path) (("/home/davidchuyaya/hellotest" + std::string(path)).c_str())
+#define PREPEND_PATH(path) ((redirectPoint + std::string(path)).c_str())
 #elif
 #define PREPEND_PATH(path) (path)
 #endif
@@ -16,8 +16,9 @@
 // If defined, will send messages to the replicas.
 #define NETWORK
 
-ClientFuse::ClientFuse(TLS<diskTeePayload, clientMsg> *replicaTLSParam) {
+ClientFuse::ClientFuse(TLS<diskTeePayload, clientMsg> *replicaTLSParam, const std::string& redirectPointParam) {
 	replicaTLS = replicaTLSParam;
+	redirectPoint = redirectPointParam;
 	written = 0;
 }
 
