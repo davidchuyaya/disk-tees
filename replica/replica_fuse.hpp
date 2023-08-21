@@ -6,6 +6,7 @@
 
 class ReplicaFuse {
 public:
+    ReplicaFuse(const std::string& directory);
     // Visitor pattern: https://www.cppstories.com/2018/09/visit-variants/. One for every possible type in clientMsg
     void operator()(const mknodParams& params);
     void operator()(const mkdirParams& params);
@@ -32,6 +33,7 @@ private:
     int written = -1; // TODO: Clear state on reconnect
     round highestRound;
     round normalRound;
+    std::string directory;
     std::map<int, clientMsg> pendingWrites;
     std::map<int, fsyncParams> pendingFsyncs; // Separate fsync from other writes, since fsync does not increment the write count
     std::map<int, int> fileHandleConverter;

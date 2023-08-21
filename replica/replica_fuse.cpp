@@ -13,10 +13,13 @@
 // If defined, will write files to the directory specified below. Used for testing locally.
 #define REPLICA_CUSTOM_DIR
 #ifdef REPLICA_CUSTOM_DIR
-#define REPLICA_PREPEND_PATH(path) (("/home/davidchuyaya/disk-tees-test" + std::string(path)).c_str())
+#define REPLICA_PREPEND_PATH(path) ((directory + std::string(path)).c_str())
 #elif
 #define REPLICA_PREPEND_PATH(path) (path)
 #endif
+
+ReplicaFuse::ReplicaFuse(const std::string& directory) : directory(directory) {
+}
 
 void ReplicaFuse::operator()(const mknodParams &params) {
     if (!preWriteCheck(params.seq, params.r, params))
