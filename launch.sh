@@ -35,16 +35,16 @@ case $TRUSTED_MODE in
   "trusted")
     LOCATION="northeurope"
     ZONE=2
-    VM_SIZE="Standard_D8as_v5"
-    IMAGE="Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
+    VM_SIZE="Standard_DC8as_v5"
+    IMAGE="Canonical:0001-com-ubuntu-confidential-vm-focal:20_04-lts-cvm:latest"
     TRUSTED_PARAMS="--security-type ConfidentialVM
                     --os-disk-security-encryption-type VMGuestStateOnly
                     --enable-vtpm";;
   "untrusted")
     LOCATION="swedencentral"
     ZONE=2
-    VM_SIZE="Standard_DC8as_v5"
-    IMAGE="Canonical:0001-com-ubuntu-confidential-vm-focal:20_04-lts-cvm:latest";;
+    VM_SIZE="Standard_D8as_v5"
+    IMAGE="Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest";;
   *)
     echo "Invalid trusted mode selected."
     print_usage
@@ -109,12 +109,6 @@ create_vms() {
     --zone $ZONE \
     --size $VM_SIZE \
     --image $IMAGE $REPLICA_COUNT $TRUSTED_PARAMS
-
-  # Open postgres port so benchbase can connect
-  if [ $1 == "client" ]
-  then
-    az vm open-port -g $RESOURCE_GROUP -n ${RESOURCE_GROUP}_$1 --port 5432
-  fi
 }
 
 # Create VMs
