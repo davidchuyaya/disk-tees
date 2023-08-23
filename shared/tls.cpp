@@ -15,6 +15,7 @@
 #include <signal.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netinet/tcp.h>
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #include <thread>
@@ -57,6 +58,7 @@ void TLS<RecvMsg, SendMsg>::startServer()
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
+    disableNaglesAlgorithm(sock);
 
     if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         std::cerr << "Unable to bind" << std::endl;
@@ -117,6 +119,7 @@ void TLS<RecvMsg, SendMsg>::connectToServer(const peer& addr) {
     loadOwnCertificates(ctx);
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
+    disableNaglesAlgorithm(sock);
     sockaddr_in sockAddr;
     sockAddr.sin_family = AF_INET;
     sockAddr.sin_port = htons(addr.port);   
@@ -322,6 +325,16 @@ std::string TLS<RecvMsg, SendMsg>::errorMessage(const std::errc errorCode) {
             return "attempt to deserialize an invalid protocol message";
         default:
             return "unknown error";
+    }
+}
+
+template <class RecvMsg, class SendMsg>
+void TLS<RecvMsg, SendMsg>::disableNaglesAlgorithm(int sock) {
+    int flag = 1;
+    int result = setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
+    if (result < 0) {
+        std::cerr << "Unable to disable Nagle's algorithm" << std::endl;
+        exit(EXIT_FAILURE);
     }
 }
 

@@ -34,4 +34,5 @@ class TLS {
         std::string readableAddr(const sockaddr_in& addr); // Format: ip::port
         RecvMsg recv(std::span<char> buffer, SSL* src); // Will allocate a new buffer if provided buffer doesn't fit
         std::string errorMessage(const std::errc errorCode);
+        void disableNaglesAlgorithm(int sock);
 };

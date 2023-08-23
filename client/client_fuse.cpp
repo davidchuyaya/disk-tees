@@ -1,4 +1,5 @@
 #include <string>
+#include <chrono>
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/file.h>
@@ -586,10 +587,8 @@ int ClientFuse::client_fsync(const char *path, int isdatasync, fuse_file_info *f
 	replicaTLS->broadcast(msg);
 
 	// block until fsync is acknowledged by quorum
-	std::cout << "Waiting for fsync: " << written << std::endl;
 	std::unique_lock<std::mutex> lock(fsyncMutex);
 	fsyncCommitted.wait(lock, [&] { return replicasCommitted >= written; });
-	std::cout << "Finished fsync: " << written << std::endl;
 	#endif
 
     return 0;
