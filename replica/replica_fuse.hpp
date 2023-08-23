@@ -3,10 +3,13 @@
 #include <map>
 #include <set>
 #include "../shared/fuse_messages.hpp"
+#include "../shared/tls.hpp"
+#include "../shared/tls.cpp"
 
 class ReplicaFuse {
 public:
-    ReplicaFuse(const std::string& directory);
+    ReplicaFuse(const int id, const std::string& directory);
+    void addTLS(TLS<clientMsg, replicaMsg> *tls);
     // Visitor pattern: https://www.cppstories.com/2018/09/visit-variants/. One for every possible type in clientMsg
     void operator()(const mknodParams& params);
     void operator()(const mkdirParams& params);
@@ -30,6 +33,7 @@ public:
     void operator()(const copyFileRangeParams& params);
 
 private:
+    int id;
     int written = -1; // TODO: Clear state on reconnect
     round highestRound;
     round normalRound;
@@ -37,6 +41,7 @@ private:
     std::map<int, clientMsg> pendingWrites;
     std::map<int, fsyncParams> pendingFsyncs; // Separate fsync from other writes, since fsync does not increment the write count
     std::map<int, int> fileHandleConverter;
+    TLS<clientMsg, replicaMsg> *clientTLS;
 
     bool preWriteCheck(const int seq, const round& r, const clientMsg& msg);
     void postWriteCheck(const int seq);

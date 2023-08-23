@@ -46,12 +46,13 @@ int main(int argc, char* argv[]) {
 
     // TODO: If we expect 1 client at all times, then we don't need to use mutexes in ReplicaFuse.
     // We have to enforce that there is only ever 1 client by limiting the number of clients that can connect
-    ReplicaFuse replicaFuse(conf.dir);
-    TLS<clientMsg, diskTeePayload> replicaTLS(conf.id, netConf.replicas, std::filesystem::current_path().string(),
+    ReplicaFuse replicaFuse(conf.id, conf.dir);
+    TLS<clientMsg, replicaMsg> replicaTLS(conf.id, netConf.replicas, std::filesystem::current_path().string(),
         [&](clientMsg payload, SSL* sender) {
         // Essentially a switch statement matching the possible types of messages
         std::visit(replicaFuse, payload);
     });
+    replicaFuse.addTLS(&replicaTLS);
 
     while (true) {}
 

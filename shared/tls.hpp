@@ -9,11 +9,6 @@
 #include <span>
 #include "network_config.hpp"
 
-struct diskTeePayload {
-    // TODO: Message types for recovery
-    std::string data;
-};
-
 template <class RecvMsg, class SendMsg>
 class TLS {
     public:

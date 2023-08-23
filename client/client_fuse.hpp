@@ -1,4 +1,6 @@
 #pragma once
+#include <map>
+#include <condition_variable>
 #include "Fuse.hpp"
 #include "Fuse.cpp"
 #include "../shared/tls.hpp"
@@ -11,7 +13,9 @@
 class ClientFuse : public Fusepp::Fuse<ClientFuse>
 {
 public:
-    ClientFuse(TLS<diskTeePayload, clientMsg> *replicaTLS, const std::string& redirectPoint);
+    ClientFuse(const std::string& redirectPoint, const int quorum);
+    void addTLS(TLS<replicaMsg, clientMsg> *tls);
+    void onRecvMsg(const replicaMsg& msg, SSL* sender);
 
     static void *client_init(fuse_conn_info *conn, fuse_config *cfg);
     static int client_getattr(const char *path, struct stat *stbuf, fuse_file_info *fi);
@@ -58,11 +62,18 @@ public:
 private:
     // Because all functions are static, ClientFuse can't carry state except by having static variables
     // inline static: See https://stackoverflow.com/a/62915890/4028758
-    inline static TLS<diskTeePayload, clientMsg> *replicaTLS;
+    inline static TLS<replicaMsg, clientMsg> *replicaTLS;
     inline static int written;
     inline static round r;
     // Directory to redirect writes to. Since we're passing through all disk operations, this is necessary to prevent retriggering FUSE in the same directory
     inline static std::string redirectPoint;
+    inline static std::mutex replicaRecvMutex;
+    inline static int replicasCommitted;
+    //TODO: Clear on reconfiguration. Also needs to pause all other writes on reconfiguration
+    inline static std::map<int, int> replicaWritten;
+    inline static int quorum;
+    inline static std::mutex fsyncMutex;
+    inline static std::condition_variable fsyncCommitted;
 
     static fuse_file_info_lite make_lite(fuse_file_info *fi);
 };

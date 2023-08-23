@@ -18,7 +18,11 @@
 #define REPLICA_PREPEND_PATH(path) (path)
 #endif
 
-ReplicaFuse::ReplicaFuse(const std::string& directory) : directory(directory) {
+ReplicaFuse::ReplicaFuse(const int id, const std::string& directory) : id(id), directory(directory) {
+}
+
+void ReplicaFuse::addTLS(TLS<clientMsg, replicaMsg>* tls) {
+    this->clientTLS = tls;
 }
 
 void ReplicaFuse::operator()(const mknodParams &params) {
@@ -250,6 +254,7 @@ void ReplicaFuse::operator()(const releaseParams& params) {
 void ReplicaFuse::operator()(const fsyncParams& params) {
     // Can't use standard preWriteCheck, since we want to add this to pendingFsyncs instead of pendingWrites
     // Code is mostly copy pasted from pendingWrites though
+    std::cout << "Received fsync: " << params.seq << std::endl;
     if (params.r != normalRound || params.r < highestRound)
         return;
     // TODO: If r > normalRound and r >= highestRound, might want to cache the write and wait for p2a with that ballot to conclude
@@ -257,7 +262,15 @@ void ReplicaFuse::operator()(const fsyncParams& params) {
         pendingFsyncs[params.seq] = params;
         return;
     }
-    // TODO: Reply to client to confirm commit
+    // Reply to client to confirm commit
+    replicaMsg msg {
+        .id = id,
+        .written = written,
+        .r = params.r
+    };
+    clientTLS->broadcast(msg);
+    pendingFsyncs.erase(params.seq);
+
     // Don't use postWriteCheck, since written was not incremented
 }
 

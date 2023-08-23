@@ -27,11 +27,13 @@ int main(int argc, char* argv[]) {
 
     networkConfig netConf = readNetworkConfig("network.json");
 
+    // TODO: Change quorum to f+1 number of nodes
+    ClientFuse fuse(config.redirectPoint, 1);
     std::filesystem::current_path(path);
-    TLS<diskTeePayload, clientMsg> replicaTLS(config.id, netConf.replicas, path, [](diskTeePayload payload, SSL* sender) {
-        std::cout << "Received message from replica: " << payload.data << std::endl;
+    TLS<replicaMsg, clientMsg> replicaTLS(config.id, netConf.replicas, path, [&](replicaMsg payload, SSL* sender) {
+        fuse.onRecvMsg(payload, sender);
     });
-
-    ClientFuse fuse(&replicaTLS, config.redirectPoint);
+    fuse.addTLS(&replicaTLS);
+    
     return fuse.run(args.argc, args.argv);
 }

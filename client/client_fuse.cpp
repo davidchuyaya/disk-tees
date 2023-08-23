@@ -16,10 +16,40 @@
 // If defined, will send messages to the replicas.
 #define NETWORK
 
-ClientFuse::ClientFuse(TLS<diskTeePayload, clientMsg> *replicaTLSParam, const std::string& redirectPointParam) {
-	replicaTLS = replicaTLSParam;
+ClientFuse::ClientFuse(const std::string& redirectPointParam, const int quorumParam) {
 	redirectPoint = redirectPointParam;
-	written = 0;
+	written = -1;
+	quorum = quorumParam;
+	replicasCommitted = 0;
+}
+
+void ClientFuse::addTLS(TLS<replicaMsg, clientMsg> *tls) {
+	replicaTLS = tls;
+}
+
+void ClientFuse::onRecvMsg(const replicaMsg& msg, SSL* sender) {
+	// TODO: Handle messages aside from fsync
+	// Obtain lock, since connections to replicas are multithreaded
+	std::unique_lock<std::mutex> lock(replicaRecvMutex);
+
+	replicaWritten[msg.id] = msg.written;
+	// we know the seq has already been committed, so there's nothing to do
+	if (replicasCommitted >= msg.written)
+		return;
+
+	int numWritten = 0;
+	for (auto& [id, written] : replicaWritten) {
+		if (written == msg.written)
+			numWritten++;
+	}
+
+	if (numWritten < quorum)
+		return;
+
+	replicasCommitted = msg.written;
+	// Wake up waiting fsyncs
+	lock.unlock();
+	fsyncCommitted.notify_all();
 }
 
 void* ClientFuse::client_init(fuse_conn_info *conn, fuse_config *cfg) {
@@ -212,8 +242,9 @@ int ClientFuse::client_mknod(const char *path, mode_t mode, dev_t rdev) {
 		return -errno;
 
 	#ifdef NETWORK
+	written += 1;
 	mknodParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = std::string(path),
 		.mode = mode,
@@ -231,8 +262,9 @@ int ClientFuse::client_mkdir(const char *path, mode_t mode) {
 		return -errno;
 
 	#ifdef NETWORK
+	written += 1;
 	mkdirParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = std::string(path),
 		.mode = mode
@@ -250,8 +282,9 @@ int ClientFuse::client_symlink(const char *target, const char *linkpath) {
 		return -errno;
 	
 	#ifdef NETWORK
+	written += 1;
 	symlinkParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.target = std::string(target),
 		.linkpath = std::string(linkpath)
@@ -268,8 +301,9 @@ int ClientFuse::client_unlink(const char *path) {
         return -errno;
 
 	#ifdef NETWORK
+	written += 1;
 	unlinkParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = std::string(path)
 	};
@@ -284,8 +318,9 @@ int ClientFuse::client_rmdir(const char *path) {
 		return -errno;
 
 	#ifdef NETWORK
+	written += 1;
 	rmdirParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = std::string(path)
 	};
@@ -301,8 +336,9 @@ int ClientFuse::client_rename(const char *oldpath, const char *newpath, unsigned
 		return -errno;
 
 	#ifdef NETWORK
+	written += 1;
 	renameParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.oldpath = std::string(oldpath),
 		.newpath = std::string(newpath)
@@ -319,8 +355,9 @@ int ClientFuse::client_link(const char *oldpath, const char *newpath) {
 		return -errno;
 	
 	#ifdef NETWORK
+	written += 1;
 	linkParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.oldpath = std::string(oldpath),
 		.newpath = std::string(newpath)
@@ -342,8 +379,9 @@ int ClientFuse::client_chmod(const char *path, mode_t mode, fuse_file_info *fi) 
 		return -errno;
 
 	#ifdef NETWORK
+	written += 1;
 	chmodParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = hasFi ? "" : std::string(path),
 		.mode = mode,
@@ -367,8 +405,9 @@ int ClientFuse::client_chown(const char *path, uid_t uid, gid_t gid, fuse_file_i
 		return -errno;
 
 	#ifdef NETWORK
+	written += 1;
 	chownParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = hasFi ? "" : std::string(path),
 		.uid = uid,
@@ -393,8 +432,9 @@ int ClientFuse::client_truncate(const char* path, off_t size, fuse_file_info *fi
         return -errno;
 
 	#ifdef NETWORK
+	written += 1;
 	truncateParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = hasFi ? "" : std::string(path),
 		.size = size,
@@ -418,8 +458,9 @@ int ClientFuse::client_utimens(const char *path, const timespec tv[2], fuse_file
 		return -errno;
 
 	#ifdef NETWORK
+	written += 1;
 	utimensParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = hasFi ? "" : std::string(path),
 		.tv0 = tv[0],
@@ -442,8 +483,9 @@ int ClientFuse::client_create(const char *path, mode_t mode, fuse_file_info *fi)
 	// std::cout << "Fh " << fd << " at path " << path << std::endl;
 
 	#ifdef NETWORK
+	written += 1;
 	createParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = std::string(path),
 		.mode = mode,
@@ -465,8 +507,9 @@ int ClientFuse::client_open(const char *path, fuse_file_info *fi) {
 	// std::cout << "Fh " << fd << " at path " << path << std::endl;
 
 	#ifdef NETWORK
+	written += 1;
 	openParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = std::string(path),
 		.fi = make_lite(fi)
@@ -493,8 +536,9 @@ int ClientFuse::client_write_buf(const char *path, fuse_bufvec *buf, off_t offse
 	std::vector<char> mem;
 	mem.insert(mem.end(), bufStart, bufStart + bufSize - buf->off);
 	// 2. Send mem
+	written += 1;
 	writeBufParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.offset = offset,
 		.buf = mem,
@@ -511,8 +555,9 @@ int ClientFuse::client_release(const char *path, fuse_file_info *fi) {
 	// std::cout << "Fh " << fi->fh << " released at path " << path << std::endl;
 
 	#ifdef NETWORK
+	written += 1;
 	releaseParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.fi = make_lite(fi)
 	};
@@ -539,6 +584,12 @@ int ClientFuse::client_fsync(const char *path, int isdatasync, fuse_file_info *f
 		.fi = make_lite(fi)
 	};
 	replicaTLS->broadcast(msg);
+
+	// block until fsync is acknowledged by quorum
+	std::cout << "Waiting for fsync: " << written << std::endl;
+	std::unique_lock<std::mutex> lock(fsyncMutex);
+	fsyncCommitted.wait(lock, [&] { return replicasCommitted >= written; });
+	std::cout << "Finished fsync: " << written << std::endl;
 	#endif
 
     return 0;
@@ -548,8 +599,9 @@ int ClientFuse::client_fallocate(const char *path, int mode, off_t offset, off_t
 	int res = posix_fallocate(fi->fh, offset, length);
 
 	#ifdef NETWORK
+	written += 1;
 	fallocateParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.offset = offset,
 		.length = length,
@@ -570,8 +622,9 @@ int ClientFuse::client_setxattr(const char *path, const char *name, const char *
 	// Value is not necessarily a string. See https://linux.die.net/man/2/setxattr.
 	std::vector<char> valueVec;
 	valueVec.insert(valueVec.end(), value, value + size);
+	written += 1;
 	setxattrParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = std::string(path),
 		.name = std::string(name),
@@ -590,8 +643,9 @@ int ClientFuse::client_removexattr(const char *path, const char *name) {
 		return -errno;
 
 	#ifdef NETWORK
+	written += 1;
 	removexattrParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.path = std::string(path),
 		.name = std::string(name)
@@ -608,8 +662,9 @@ int ClientFuse::client_copy_file_range(const char *path_in, fuse_file_info *fi_i
 		return -errno;
 	
 	#ifdef NETWORK
+	written += 1;
 	copyFileRangeParams msg {
-		.seq = written++,
+		.seq = written,
 		.r = r,
 		.fi_in = make_lite(fi_in),
 		.off_in = off_in,

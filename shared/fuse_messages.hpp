@@ -224,3 +224,9 @@ typedef std::variant<mknodParams,
                     setxattrParams,
                     removexattrParams,
                     copyFileRangeParams> clientMsg;
+
+struct replicaMsg {
+    int id;
+    int written;
+    round r;
+};
