@@ -111,7 +111,7 @@ export function on_get_cert(request) {
   if (cert === undefined) {
     return { body: { error: `No cert for id: ${parsedQuery.id}` } };
   }
-  return { body: ccf.bufToStr(cert) };
+  return { body: { cert: ccf.bufToStr(cert) } };
 }
 
 /**
