@@ -1,0 +1,44 @@
+{
+  "endpoints": {
+    "/matchmaker/addcert": {
+      "post": {
+        "js_module": "matchmaker.js",
+        "js_function": "on_add_cert",
+        "forwarding_required": "always",
+        "authn_policies": ["user_cert"],
+        "mode": "readwrite",
+        "openapi": {}
+      }
+    },
+    "/matchmaker/getcert": {
+      "post": {
+        "js_module": "matchmaker.js",
+        "js_function": "on_get_cert",
+        "forwarding_required": "sometimes",
+        "authn_policies": ["user_cert"],
+        "mode": "readonly",
+        "openapi": {}
+      }
+    },
+    "/matchmaker/match": {
+      "post": {
+        "js_module": "matchmaker.js",
+        "js_function": "on_match_a",
+        "forwarding_required": "always",
+        "authn_policies": ["user_cert"],
+        "mode": "readwrite",
+        "openapi": {}
+      }
+    },
+    "/matchmaker/garbage": {
+      "post": {
+        "js_module": "matchmaker.js",
+        "js_function": "on_garbage_a",
+        "forwarding_required": "always",
+        "authn_policies": ["user_cert"],
+        "mode": "readwrite",
+        "openapi": {}
+      }
+    }
+  }
+}
