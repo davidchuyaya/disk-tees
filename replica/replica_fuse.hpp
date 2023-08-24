@@ -34,7 +34,7 @@ public:
 
 private:
     int id;
-    int written = -1; // TODO: Clear state on reconnect
+    int written = -1; // TODO: Clear state on leader election 
     round highestRound;
     round normalRound;
     std::string directory;

@@ -254,7 +254,6 @@ void ReplicaFuse::operator()(const releaseParams& params) {
 void ReplicaFuse::operator()(const fsyncParams& params) {
     // Can't use standard preWriteCheck, since we want to add this to pendingFsyncs instead of pendingWrites
     // Code is mostly copy pasted from pendingWrites though
-    std::cout << "Received fsync: " << params.seq << std::endl;
     if (params.r != normalRound || params.r < highestRound)
         return;
     // TODO: If r > normalRound and r >= highestRound, might want to cache the write and wait for p2a with that ballot to conclude
