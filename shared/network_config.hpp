@@ -2,31 +2,29 @@
 #include <arpa/inet.h>
 #include <string>
 #include <vector>
+#include <map>
 
-struct peer {
-    std::string ip;
-    int port;
-    std::string name;
+typedef std::map<int, std::string> networkConfig;
+typedef std::vector<std::string> addresses;
+enum NodeType {
+    Client,
+    Replica
 };
 
-struct networkConfig {
-    std::vector<peer> ccfNodes;
-    std::vector<peer> replicas;
-    std::vector<peer> clients;
-};
+namespace NetworkConfig {
+    static const int CLIENT_START_PORT = 10000;
+    static const int REPLICA_START_PORT = 10100;
 
-/**
- * Expected JSON format:
- * [
- *   {
- *     "ip": "127.0.0.1", // Private IP of the node
- *     "replicaPort": 4433, // Port for listening to other replicas
- *     "clientPort": 5433, // Port for listening to clients
- *     "ccfPort": 6433, // Port for listening to CCF
- *     "name": "disk_tee0", // Certificate should be disk_tee0_cert.pem, key should be disk_tee0_key.pem (if this replica owns the key),
- *                             and they must be in the main directory (disk-tees)
- *     "id": 0 // 0-indexed
- *   }
- * ]
-*/
-networkConfig readNetworkConfig(const std::string& file);
+    /**
+     * Expected JSON format:
+     * [
+     *   {
+     *     "ip": "127.0.0.1", // Private IP of the node
+     *     "id": 0 
+     *   }
+     * ]
+    */
+    networkConfig readNetworkConfig(const std::string& file);
+    addresses configToAddrs(const NodeType type, const networkConfig& conf);
+    int getPort(const NodeType type, const int id);
+}

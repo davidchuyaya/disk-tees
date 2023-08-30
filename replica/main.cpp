@@ -10,7 +10,7 @@
 
 struct config {
     int id;
-    std::string dir;
+    std::string trustedMode;
 };
 
 config parseArgs(int argc, char* argv[]) {
@@ -18,7 +18,7 @@ config parseArgs(int argc, char* argv[]) {
 
     // set default values
     if (argc == 1) {
-        std::cerr << "Usage: " << argv[0] << " -i <id> -d <directory>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " -i <id> -t <trusted mode>" << std::endl;
         exit(EXIT_FAILURE);
     }
 
@@ -29,8 +29,8 @@ config parseArgs(int argc, char* argv[]) {
             case 'i':
                 conf.id = atoi(optarg);
                 break;
-            case 'd': // directory, no ending slash
-                conf.dir = optarg;
+            case 't':
+                conf.trustedMode = optarg;
                 break;
             case '?':
                 exit(EXIT_FAILURE);
@@ -40,19 +40,29 @@ config parseArgs(int argc, char* argv[]) {
     return conf;
 }
 
+std::string getDir(const config& conf) {
+    if (std::string(conf.trustedMode) == "local")
+        return "~/disk-tees/build/replica" + std::to_string(conf.id) + "/storage";
+    else
+        return "/home/azureuser/disk-tees/build/replica" + std::to_string(conf.id) + "/storage";
+}
+
 int main(int argc, char* argv[]) {
     config conf = parseArgs(argc, argv);
-    networkConfig netConf = readNetworkConfig("network.json");
+    
+    std::string path = std::filesystem::current_path().string();
+    networkConfig ccfConf = NetworkConfig::readNetworkConfig("ccf.json");
+    std::string name = "replica" + std::to_string(conf.id);
 
-    // TODO: If we expect 1 client at all times, then we don't need to use mutexes in ReplicaFuse.
-    // We have to enforce that there is only ever 1 client by limiting the number of clients that can connect
-    ReplicaFuse replicaFuse(conf.id, conf.dir);
-    TLS<clientMsg, replicaMsg> replicaTLS(conf.id, netConf.replicas, std::filesystem::current_path().string(),
-        [&](clientMsg payload, SSL* sender) {
+    ReplicaFuse replicaFuse(conf.id, name, getDir(conf), ccfConf, path);
+    TLS<clientMsg, replicaMsg> clientTLS(conf.id, name, Client, Replica, {}, path,
+        [&](const clientMsg& payload, const std::string& addr, SSL* sender) {
+        std::unique_lock<std::mutex> lock(replicaFuse.allMutex);
+        replicaFuse.shouldBroadcast = true; // Broadcast messages we directly received from the client
         // Essentially a switch statement matching the possible types of messages
         std::visit(replicaFuse, payload);
     });
-    replicaFuse.addTLS(&replicaTLS);
+    replicaFuse.addClientTLS(&clientTLS);
 
     while (true) {}
 

@@ -9,26 +9,26 @@
 #endif
 #include <fuse.h>
 
-struct round {
-    int roundNum = 0;
+struct ballot {
+    int ballotNum = 0;
     int clientId = 0;
     int configNum = 0;
 
-    bool operator ==(const round& rhs) const {
-        return roundNum == rhs.roundNum && clientId == rhs.clientId && configNum == rhs.configNum;
+    bool operator ==(const ballot& rhs) const {
+        return ballotNum == rhs.ballotNum && clientId == rhs.clientId && configNum == rhs.configNum;
     }
 
-    bool operator <(const round& rhs) const {
-        bool roundNumLess = roundNum < rhs.roundNum;
-        bool idLess = roundNum == rhs.roundNum && clientId < rhs.clientId;
-        bool configLess = roundNum == rhs.roundNum && clientId == rhs.clientId && configNum < rhs.configNum;
-        return roundNumLess || idLess || configLess;
+    bool operator <(const ballot& rhs) const {
+        bool ballotNumLess = ballotNum < rhs.ballotNum;
+        bool idLess = ballotNum == rhs.ballotNum && clientId < rhs.clientId;
+        bool configLess = ballotNum == rhs.ballotNum && clientId == rhs.clientId && configNum < rhs.configNum;
+        return ballotNumLess || idLess || configLess;
     }
 };
 
 // inline keyword: See https://stackoverflow.com/a/12802613/4028758
-inline std::ostream& operator <<(std::ostream& out, const round& r) {
-    return out << "(" << r.roundNum << "," << r.clientId << "," << r.configNum << ")";
+inline std::ostream& operator <<(std::ostream& out, const ballot& r) {
+    return out << "(" << r.ballotNum << "," << r.clientId << "," << r.configNum << ")";
 }
 
 /**
@@ -47,7 +47,7 @@ struct fuse_file_info_lite {
 
 struct mknodParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
     mode_t mode;
     dev_t rdev;
@@ -55,40 +55,40 @@ struct mknodParams {
 
 struct mkdirParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
     mode_t mode;
 };
 
 struct symlinkParams {
     int seq;
-    round r;
+    ballot r;
     std::string target;
     std::string linkpath;
 };
 
 struct unlinkParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
 };
 
 struct rmdirParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
 };
 
 struct renameParams {
     int seq;
-    round r;
+    ballot r;
     std::string oldpath;
     std::string newpath;
 };
 
 struct linkParams {
     int seq;
-    round r;
+    ballot r;
     std::string oldpath;
     std::string newpath;
 };
@@ -96,7 +96,7 @@ struct linkParams {
 // Use fi or path depending on whether hasFi is true
 struct chmodParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
     mode_t mode;
     fuse_file_info_lite fi;
@@ -106,7 +106,7 @@ struct chmodParams {
 // Use fi or path depending on whether hasFi is true
 struct chownParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
     uid_t uid;
     gid_t gid;
@@ -116,7 +116,7 @@ struct chownParams {
 
 struct truncateParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
     off_t size;
     fuse_file_info_lite fi;
@@ -125,7 +125,7 @@ struct truncateParams {
 
 struct utimensParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
     timespec tv0; // split tv array into 2 fields because ZPP likes it better
     timespec tv1;
@@ -135,7 +135,7 @@ struct utimensParams {
 
 struct createParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
     mode_t mode;
     fuse_file_info_lite fi;
@@ -143,14 +143,14 @@ struct createParams {
 
 struct openParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
     fuse_file_info_lite fi;
 };
 
 struct writeBufParams {
     int seq;
-    round r;
+    ballot r;
     off_t offset;
     std::vector<char> buf; // Use a vector so the receiver can resize its buffer based on how much is sent.
     fuse_file_info_lite fi;
@@ -158,19 +158,19 @@ struct writeBufParams {
 
 struct releaseParams {
     int seq;
-    round r;
+    ballot r;
     fuse_file_info_lite fi;
 };
 
 struct fsyncParams {
     int seq;
-    round r;
+    ballot r;
     fuse_file_info_lite fi;
 };
 
 struct fallocateParams {
     int seq;
-    round r;
+    ballot r;
     off_t offset;
     off_t length;
     fuse_file_info_lite fi;
@@ -178,7 +178,7 @@ struct fallocateParams {
 
 struct setxattrParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
     std::string name;
     std::vector<char> value;
@@ -187,20 +187,35 @@ struct setxattrParams {
 
 struct removexattrParams {
     int seq;
-    round r;
+    ballot r;
     std::string path;
     std::string name;
 };
 
 struct copyFileRangeParams {
     int seq;
-    round r;
+    ballot r;
     fuse_file_info_lite fi_in;
     off_t off_in;
     fuse_file_info_lite fi_out;
     off_t off_out;
     size_t len;
     int flags;
+};
+
+struct p1a {
+    ballot r;
+    networkConfig netConf;
+};
+
+struct diskReq {
+    ballot r;
+};
+
+struct p2a {
+    ballot r;
+    int written;
+    std::string diskDigest;
 };
 
 // Add to variant as the number of variants increase
@@ -223,10 +238,46 @@ typedef std::variant<mknodParams,
                     fallocateParams,
                     setxattrParams,
                     removexattrParams,
-                    copyFileRangeParams> clientMsg;
+                    copyFileRangeParams,
+                    p1a,
+                    diskReq,
+                    p2a> clientMsg;
 
-struct replicaMsg {
+struct p1b {
+    int id;
+    ballot clientBallot;
+    int written;
+    ballot normalBallot;
+    ballot highestBallot;
+};
+
+struct disk {
+    ballot clientBallot;
+    std::string diskDigest;
+};
+
+struct p2b {
+    int id;
+    ballot clientBallot;
+    int written;
+    ballot highestBallot;
+};
+
+struct fsyncMissing {
+    int id;
+    ballot r;
+    int fsyncSeq;
+    std::vector<int> holes;
+};
+
+struct fsyncAck {
     int id;
     int written;
-    round r;
+    ballot r;
 };
+
+typedef std::variant<p1b,
+                    disk,
+                    p2b,
+                    fsyncMissing,
+                    fsyncAck> replicaMsg;

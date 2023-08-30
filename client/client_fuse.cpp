@@ -17,10 +17,15 @@
 // If defined, will send messages to the replicas.
 #define NETWORK
 
-ClientFuse::ClientFuse(const std::string& redirectPointParam, const int quorumParam) {
+ClientFuse::ClientFuse(const bool networkParam, const ballot ballotParam, const std::string& redirectPointParam, const int quorumParam,
+ const addresses& configParam) {
+	network = networkParam;
+	r = ballotParam;
 	redirectPoint = redirectPointParam;
-	written = -1;
 	quorum = quorumParam;
+	config = configParam;
+
+	written = -1;
 	replicasCommitted = 0;
 }
 
@@ -28,8 +33,11 @@ void ClientFuse::addTLS(TLS<replicaMsg, clientMsg> *tls) {
 	replicaTLS = tls;
 }
 
-void ClientFuse::onRecvMsg(const replicaMsg& msg, SSL* sender) {
-	// TODO: Handle messages aside from fsync
+void ClientFuse::operator()(const p1b& msg) {
+	std::unique_lock<std::mutex> lock(replicaRecvMutex);
+}
+
+void ClientFuse::operator()(const fsyncAck& msg) {
 	// Obtain lock, since connections to replicas are multithreaded
 	std::unique_lock<std::mutex> lock(replicaRecvMutex);
 
@@ -48,6 +56,7 @@ void ClientFuse::onRecvMsg(const replicaMsg& msg, SSL* sender) {
 		return;
 
 	replicasCommitted = msg.written;
+	uncommittedWrites.clear();
 	// Wake up waiting fsyncs
 	lock.unlock();
 	fsyncCommitted.notify_all();
@@ -242,17 +251,20 @@ int ClientFuse::client_mknod(const char *path, mode_t mode, dev_t rdev) {
 	if (res == -1)
 		return -errno;
 
-	#ifdef NETWORK
-	written += 1;
-	mknodParams msg {
-		.seq = written,
-		.r = r,
-		.path = std::string(path),
-		.mode = mode,
-		.rdev = rdev
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(mknodParams {
+			.seq = written,
+			.r = r,
+			.path = std::string(path),
+			.mode = mode,
+			.rdev = rdev
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -262,17 +274,20 @@ int ClientFuse::client_mkdir(const char *path, mode_t mode) {
 	if (res == -1)
 		return -errno;
 
-	#ifdef NETWORK
-	written += 1;
-	mkdirParams msg {
-		.seq = written,
-		.r = r,
-		.path = std::string(path),
-		.mode = mode
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
 
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(mkdirParams {
+			.seq = written,
+			.r = r,
+			.path = std::string(path),
+			.mode = mode
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
+	
 	return 0;
 }
 
@@ -282,16 +297,19 @@ int ClientFuse::client_symlink(const char *target, const char *linkpath) {
 	if (res == -1)
 		return -errno;
 	
-	#ifdef NETWORK
-	written += 1;
-	symlinkParams msg {
-		.seq = written,
-		.r = r,
-		.target = std::string(target),
-		.linkpath = std::string(linkpath)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(symlinkParams {
+			.seq = written,
+			.r = r,
+			.target = std::string(target),
+			.linkpath = std::string(linkpath)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -301,15 +319,19 @@ int ClientFuse::client_unlink(const char *path) {
     if (res == -1)
         return -errno;
 
-	#ifdef NETWORK
-	written += 1;
-	unlinkParams msg {
-		.seq = written,
-		.r = r,
-		.path = std::string(path)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(unlinkParams {
+			.seq = written,
+			.r = r,
+			.path = std::string(path)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
+	   
     return 0;
 }
 
@@ -318,15 +340,18 @@ int ClientFuse::client_rmdir(const char *path) {
 	if (res == -1)
 		return -errno;
 
-	#ifdef NETWORK
-	written += 1;
-	rmdirParams msg {
-		.seq = written,
-		.r = r,
-		.path = std::string(path)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(rmdirParams {
+			.seq = written,
+			.r = r,
+			.path = std::string(path)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -336,16 +361,19 @@ int ClientFuse::client_rename(const char *oldpath, const char *newpath, unsigned
 	if (res == -1)
 		return -errno;
 
-	#ifdef NETWORK
-	written += 1;
-	renameParams msg {
-		.seq = written,
-		.r = r,
-		.oldpath = std::string(oldpath),
-		.newpath = std::string(newpath)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(renameParams {
+			.seq = written,
+			.r = r,
+			.oldpath = std::string(oldpath),
+			.newpath = std::string(newpath)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -355,16 +383,19 @@ int ClientFuse::client_link(const char *oldpath, const char *newpath) {
 	if (res == -1)
 		return -errno;
 	
-	#ifdef NETWORK
-	written += 1;
-	linkParams msg {
-		.seq = written,
-		.r = r,
-		.oldpath = std::string(oldpath),
-		.newpath = std::string(newpath)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(linkParams {
+			.seq = written,
+			.r = r,
+			.oldpath = std::string(oldpath),
+			.newpath = std::string(newpath)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -379,18 +410,21 @@ int ClientFuse::client_chmod(const char *path, mode_t mode, fuse_file_info *fi) 
 	if (res == -1)
 		return -errno;
 
-	#ifdef NETWORK
-	written += 1;
-	chmodParams msg {
-		.seq = written,
-		.r = r,
-		.path = hasFi ? "" : std::string(path),
-		.mode = mode,
-		.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
-		.hasFi = hasFi
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(chmodParams {
+			.seq = written,
+			.r = r,
+			.path = hasFi ? "" : std::string(path),
+			.mode = mode,
+			.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
+			.hasFi = hasFi
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -405,19 +439,22 @@ int ClientFuse::client_chown(const char *path, uid_t uid, gid_t gid, fuse_file_i
 	if (res == -1)
 		return -errno;
 
-	#ifdef NETWORK
-	written += 1;
-	chownParams msg {
-		.seq = written,
-		.r = r,
-		.path = hasFi ? "" : std::string(path),
-		.uid = uid,
-		.gid = gid,
-		.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
-		.hasFi = hasFi
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(chownParams {
+			.seq = written,
+			.r = r,
+			.path = hasFi ? "" : std::string(path),
+			.uid = uid,
+			.gid = gid,
+			.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
+			.hasFi = hasFi
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -432,18 +469,21 @@ int ClientFuse::client_truncate(const char* path, off_t size, fuse_file_info *fi
     if (res == -1)
         return -errno;
 
-	#ifdef NETWORK
-	written += 1;
-	truncateParams msg {
-		.seq = written,
-		.r = r,
-		.path = hasFi ? "" : std::string(path),
-		.size = size,
-		.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
-		.hasFi = hasFi
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(truncateParams {
+			.seq = written,
+			.r = r,
+			.path = hasFi ? "" : std::string(path),
+			.size = size,
+			.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
+			.hasFi = hasFi
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
     return 0;
 }
@@ -458,19 +498,22 @@ int ClientFuse::client_utimens(const char *path, const timespec tv[2], fuse_file
 	if (res == -1)
 		return -errno;
 
-	#ifdef NETWORK
-	written += 1;
-	utimensParams msg {
-		.seq = written,
-		.r = r,
-		.path = hasFi ? "" : std::string(path),
-		.tv0 = tv[0],
-		.tv1 = tv[1],
-		.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
-		.hasFi = hasFi
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(utimensParams {
+			.seq = written,
+			.r = r,
+			.path = hasFi ? "" : std::string(path),
+			.tv0 = tv[0],
+			.tv1 = tv[1],
+			.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
+			.hasFi = hasFi
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -483,17 +526,20 @@ int ClientFuse::client_create(const char *path, mode_t mode, fuse_file_info *fi)
 	fi->fh = fd;
 	// std::cout << "Fh " << fd << " at path " << path << std::endl;
 
-	#ifdef NETWORK
-	written += 1;
-	createParams msg {
-		.seq = written,
-		.r = r,
-		.path = std::string(path),
-		.mode = mode,
-		.fi = make_lite(fi)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(createParams {
+			.seq = written,
+			.r = r,
+			.path = std::string(path),
+			.mode = mode,
+			.fi = make_lite(fi)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -507,16 +553,19 @@ int ClientFuse::client_open(const char *path, fuse_file_info *fi) {
 	fi->fh = fd;
 	// std::cout << "Fh " << fd << " at path " << path << std::endl;
 
-	#ifdef NETWORK
-	written += 1;
-	openParams msg {
-		.seq = written,
-		.r = r,
-		.path = std::string(path),
-		.fi = make_lite(fi)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(openParams {
+			.seq = written,
+			.r = r,
+			.path = std::string(path),
+			.fi = make_lite(fi)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -529,24 +578,27 @@ int ClientFuse::client_write_buf(const char *path, fuse_bufvec *buf, off_t offse
 	dst.buf[0].fd = fi->fh;
 	dst.buf[0].pos = offset;
 
-	#ifdef NETWORK
-	// 1. Copy memory from buffer into mem
-	char* bufStart = (char*) buf->buf[buf->idx].mem + buf->off;
-	// TODO: This is probably the critical point of the code, and we're doing 2 copies (1 into the vector, 1 after serializing).
-	// How do we do this with zero copy? sendFile?
-	std::vector<char> mem;
-	mem.insert(mem.end(), bufStart, bufStart + bufSize - buf->off);
-	// 2. Send mem
-	written += 1;
-	writeBufParams msg {
-		.seq = written,
-		.r = r,
-		.offset = offset,
-		.buf = mem,
-		.fi = make_lite(fi)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		// 1. Copy memory from buffer into mem
+		char* bufStart = (char*) buf->buf[buf->idx].mem + buf->off;
+		// TODO: This is probably the critical point of the code, and we're doing 2 copies (1 into the vector, 1 after serializing).
+		// How do we do this with zero copy? sendFile?
+		std::vector<char> mem;
+		mem.insert(mem.end(), bufStart, bufStart + bufSize - buf->off);
+		// 2. Send mem
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(writeBufParams {
+			.seq = written,
+			.r = r,
+			.offset = offset,
+			.buf = mem,
+			.fi = make_lite(fi)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return fuse_buf_copy(&dst, buf, FUSE_BUF_SPLICE_NONBLOCK);
 }
@@ -555,15 +607,18 @@ int ClientFuse::client_release(const char *path, fuse_file_info *fi) {
     close(fi->fh);
 	// std::cout << "Fh " << fi->fh << " released at path " << path << std::endl;
 
-	#ifdef NETWORK
-	written += 1;
-	releaseParams msg {
-		.seq = written,
-		.r = r,
-		.fi = make_lite(fi)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(releaseParams {
+			.seq = written,
+			.r = r,
+			.fi = make_lite(fi)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
     return 0;
 }
@@ -578,18 +633,22 @@ int ClientFuse::client_fsync(const char *path, int isdatasync, fuse_file_info *f
     if (res == -1)
         return -errno;
 
-	#ifdef NETWORK
-	fsyncParams msg {
-		.seq = written, // Note: Fsync does not increase the written count
-		.r = r,
-		.fi = make_lite(fi)
-	};
-	replicaTLS->broadcast(msg);
+	if (network) {
+		{
+			std::unique_lock<std::mutex> lock(reconfigMutex);
+			reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+		}
 
-	// block until fsync is acknowledged by quorum
-	std::unique_lock<std::mutex> lock(fsyncMutex);
-	fsyncCommitted.wait(lock, [&] { return replicasCommitted >= written; });
-	#endif
+		replicaTLS->broadcast(fsyncParams {
+			.seq = written, // Note: Fsync does not increase the written count
+			.r = r,
+			.fi = make_lite(fi)
+		}, config);
+
+		// block until fsync is acknowledged by quorum
+		std::unique_lock<std::mutex> lock(replicaRecvMutex);
+		fsyncCommitted.wait(lock, [&] { return replicasCommitted >= written; });
+	}
 
     return 0;
 }
@@ -597,17 +656,20 @@ int ClientFuse::client_fsync(const char *path, int isdatasync, fuse_file_info *f
 int ClientFuse::client_fallocate(const char *path, int mode, off_t offset, off_t length, fuse_file_info *fi) {
 	int res = posix_fallocate(fi->fh, offset, length);
 
-	#ifdef NETWORK
-	written += 1;
-	fallocateParams msg {
-		.seq = written,
-		.r = r,
-		.offset = offset,
-		.length = length,
-		.fi = make_lite(fi)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(fallocateParams {
+			.seq = written,
+			.r = r,
+			.offset = offset,
+			.length = length,
+			.fi = make_lite(fi)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return -res;
 }
@@ -617,21 +679,24 @@ int ClientFuse::client_setxattr(const char *path, const char *name, const char *
 	if (res == -1)
 		return -errno;
 
-	#ifdef NETWORK
-	// Value is not necessarily a string. See https://linux.die.net/man/2/setxattr.
-	std::vector<char> valueVec;
-	valueVec.insert(valueVec.end(), value, value + size);
-	written += 1;
-	setxattrParams msg {
-		.seq = written,
-		.r = r,
-		.path = std::string(path),
-		.name = std::string(name),
-		.value = valueVec,
-		.flags = flags
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		// Value is not necessarily a string. See https://linux.die.net/man/2/setxattr.
+		std::vector<char> valueVec;
+		valueVec.insert(valueVec.end(), value, value + size);
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(setxattrParams {
+			.seq = written,
+			.r = r,
+			.path = std::string(path),
+			.name = std::string(name),
+			.value = valueVec,
+			.flags = flags
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }
@@ -641,16 +706,19 @@ int ClientFuse::client_removexattr(const char *path, const char *name) {
 	if (res == -1)
 		return -errno;
 
-	#ifdef NETWORK
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
 	written += 1;
-	removexattrParams msg {
-		.seq = written,
-		.r = r,
-		.path = std::string(path),
-		.name = std::string(name)
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+		auto& msg = uncommittedWrites.emplace_back(removexattrParams {
+			.seq = written,
+			.r = r,
+			.path = std::string(path),
+			.name = std::string(name)
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 	
 	return 0;
 }
@@ -660,20 +728,23 @@ int ClientFuse::client_copy_file_range(const char *path_in, fuse_file_info *fi_i
 	if (res == -1)
 		return -errno;
 	
-	#ifdef NETWORK
-	written += 1;
-	copyFileRangeParams msg {
-		.seq = written,
-		.r = r,
-		.fi_in = make_lite(fi_in),
-		.off_in = off_in,
-		.fi_out = make_lite(fi_out),
-		.off_out = off_out,
-		.len = len,
-		.flags = flags
-	};
-	replicaTLS->broadcast(msg);
-	#endif
+	if (network) {
+		std::unique_lock<std::mutex> lock(reconfigMutex);
+		reconfigComplete.wait(lock, [&] { return !isReconfiguring; });
+
+		written += 1;
+		auto& msg = uncommittedWrites.emplace_back(copyFileRangeParams {
+			.seq = written,
+			.r = r,
+			.fi_in = make_lite(fi_in),
+			.off_in = off_in,
+			.fi_out = make_lite(fi_out),
+			.off_out = off_out,
+			.len = len,
+			.flags = flags
+		});
+		replicaTLS->sendRoundRobin(msg, config);
+	}
 
 	return 0;
 }

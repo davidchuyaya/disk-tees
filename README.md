@@ -2,14 +2,21 @@
 2f+1 confidential servers to support a rollback-detecting disk abstraction.
 
 ## Installation 
-Execute the following commands to run the scripts and executables locally:
+To run locally, this repo must be cloned to the user's home directory `~` and cannot be renamed, since the absolute location of many scripts is critical to correctness.
+
+Execute the following commands to install the necessary packages to compile this repo:
 ```bash
 ./install.sh
 cmake .
 make
 ```
 
-In order to launch any VMs, you must install the Azure CLI locally as well:
+(Test local) Execute the following commands to run the benchmarks locally:
+```bash
+./local_install.sh
+```
+
+(Test remote) In order to launch any VMs, you must install the Azure CLI locally as well:
 ```bash
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 ```
@@ -20,8 +27,6 @@ If you want to test locally, you'd need to create the necessary keys and certifi
 ```bash
 ./create_testing_cert.sh
 ```
-
-TODO: Add instructions for setting up tmpfs locally?
 
 TODO: Figure of how writes enter through the mountpoint, are sent to the replicas, and then are written to the redirect point and the replica's directory.
 

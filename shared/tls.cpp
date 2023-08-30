@@ -28,17 +28,17 @@
 
 static const int CONNECTION_RETRY_TIMEOUT_SEC = 5;
 static const int READ_BUFFER_SIZE = 8192;
+static const int CLIENT_START_PORT = 10000;
+static const int REPLICA_START_PORT = 10100;
 
 template <class RecvMsg, class SendMsg>
-TLS<RecvMsg, SendMsg>::TLS(const int myID, const std::vector<peer> netConf, const std::string path, const std::function<void(RecvMsg, SSL*)> onRecv) :
-            myID(myID), netConf(netConf), path(path), onRecv(onRecv) {
-    // Connect to peers asynchronously, with lower-numbered peers connecting to higher-numbered peers
-    for (int i = myID + 1; i < netConf.size(); i++) {
-        const peer& addr = netConf[i];
-        std::thread(&TLS::connectToServer, this, addr).detach();
-    }
+TLS<RecvMsg, SendMsg>::TLS(const int id, const std::string name, const NodeType remoteType, const NodeType ownType,
+    const networkConfig netConf, const std::string path, const std::function<void(RecvMsg, std::string, SSL*)> onRecv) :
+        id(id), name(name), remoteType(remoteType), ownType(ownType), path(path), onRecv(onRecv) {
+    newNetwork(netConf);
     // Start server asynchronously
-    std::thread(&TLS::startServer, this).detach();
+    if (ownType == Replica)
+        std::thread(&TLS::startServer, this).detach();
 }
 
 template <class RecvMsg, class SendMsg>
@@ -54,7 +54,7 @@ void TLS<RecvMsg, SendMsg>::startServer()
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
-    addr.sin_port = htons(netConf[myID].port);
+    addr.sin_port = htons(NetworkConfig::getPort(ownType, id));
     addr.sin_addr.s_addr = htonl(INADDR_ANY);
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -72,10 +72,10 @@ void TLS<RecvMsg, SendMsg>::startServer()
     std::cout << "Started server" << std::endl;
 
     while (true) {
-        sockaddr_in addr;
-        unsigned int len = sizeof(addr);
+        sockaddr_in sockAddr;
+        unsigned int len = sizeof(sockAddr);
 
-        int client = accept(sock, (struct sockaddr*)&addr, &len);
+        int client = accept(sock, (struct sockaddr*)&sockAddr, &len);
         if (client < 0) {
             std::cerr << "Unable to accept" << std::endl;
             continue;
@@ -94,15 +94,14 @@ void TLS<RecvMsg, SendMsg>::startServer()
         std::cout << "Client SSL connection accepted" << std::endl;
 
         // Add connection to map
-        // TODO: If connection already exists, something's going on (TLS impersonation)
-        const std::string key = readableAddr(addr);
+        const std::string addr = readableAddr(sockAddr);
         {
             std::unique_lock lock(connectionsMutex);
-            connections.emplace(key, ssl);
+            connections.emplace(addr, ssl);
         }
 
         // Listen to the client on an async thread
-        std::thread connectionThread = std::thread(&TLS::threadListen, this, key, addr, ssl);
+        std::thread connectionThread = std::thread(&TLS::threadListen, this, addr, ssl);
         connectionThread.detach();
     }
 
@@ -112,7 +111,7 @@ void TLS<RecvMsg, SendMsg>::startServer()
 }
 
 template <class RecvMsg, class SendMsg>
-void TLS<RecvMsg, SendMsg>::connectToServer(const peer& addr) {
+void TLS<RecvMsg, SendMsg>::connectToServer(const int peerId, const std::string& peerIp) {
     SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
     loadAcceptableCertificates(ctx);
@@ -122,20 +121,21 @@ void TLS<RecvMsg, SendMsg>::connectToServer(const peer& addr) {
     disableNaglesAlgorithm(sock);
     sockaddr_in sockAddr;
     sockAddr.sin_family = AF_INET;
-    sockAddr.sin_port = htons(addr.port);   
-    inet_pton(AF_INET, addr.ip.c_str(), &(sockAddr.sin_addr.s_addr));
+    int port = NetworkConfig::getPort(remoteType, peerId);
+    sockAddr.sin_port = htons(port);
+    inet_pton(AF_INET, peerIp.c_str(), &(sockAddr.sin_addr.s_addr));
     
     SSL *ssl = SSL_new(ctx);
     SSL_set_fd(ssl, sock);
-    SSL_set_tlsext_host_name(ssl, addr.ip.c_str());
-    SSL_set1_host(ssl, addr.ip.c_str());
+    SSL_set_tlsext_host_name(ssl, peerIp.c_str());
+    SSL_set1_host(ssl, peerIp.c_str());
 
-    std::string readableAddrStr = addr.ip + ":" + std::to_string(addr.port);
+    std::string addr = peerIp + ":" + std::to_string(port);
 
     while (true) {
         // code for connection is in a loop so we automatically attempt to reconnect
         while (connect(sock, (struct sockaddr*) &sockAddr, sizeof(sockAddr)) != 0) {
-            std::cout << "Unable to TCP connect to server " << addr.ip << ", retrying in " << CONNECTION_RETRY_TIMEOUT_SEC << "s..." << std::endl;
+            std::cout << "Unable to TCP connect to server " << addr << ", retrying in " << CONNECTION_RETRY_TIMEOUT_SEC << "s..." << std::endl;
             std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_TIMEOUT_SEC));
         }
         std::cout << "TCP connection to server successful" << std::endl;
@@ -149,7 +149,7 @@ void TLS<RecvMsg, SendMsg>::connectToServer(const peer& addr) {
         // Add connection to map
         {
             std::unique_lock lock(connectionsMutex);
-            connections.emplace(readableAddrStr, ssl);
+            connections.emplace(addr, ssl);
         }
 
         /* Loop to send input from keyboard */
@@ -157,7 +157,7 @@ void TLS<RecvMsg, SendMsg>::connectToServer(const peer& addr) {
         try {
             while (true) {
                 RecvMsg recvPayload = recv(readBuffer, ssl);
-                onRecv(recvPayload, ssl);
+                onRecv(recvPayload, addr, ssl);
             }
         }
         catch (const std::exception& e) { // on exception, close connection
@@ -168,7 +168,7 @@ void TLS<RecvMsg, SendMsg>::connectToServer(const peer& addr) {
     // Remove the connection from the map
     {
         std::unique_lock lock(connectionsMutex);
-        connections.erase(readableAddrStr);
+        connections.erase(addr);
     }
 
     SSL_shutdown(ssl);
@@ -178,12 +178,12 @@ void TLS<RecvMsg, SendMsg>::connectToServer(const peer& addr) {
 }
 
 template <class RecvMsg, class SendMsg>
-void TLS<RecvMsg, SendMsg>::threadListen(const std::string senderReadableAddr, const sockaddr_in senderAddr, SSL* sender) {
+void TLS<RecvMsg, SendMsg>::threadListen(const std::string& addr, SSL* sender) {
     char readBuffer[READ_BUFFER_SIZE];
     try {
         while (true) {
             RecvMsg recvPayload = recv(readBuffer, sender);
-            onRecv(recvPayload, sender);
+            onRecv(recvPayload, addr, sender);
         }
     }
     catch (const std::exception& e) { // on exception, close connection
@@ -193,7 +193,7 @@ void TLS<RecvMsg, SendMsg>::threadListen(const std::string senderReadableAddr, c
     // Remove the connection from the map
     {
         std::unique_lock lock(connectionsMutex);
-        connections.erase(senderReadableAddr);
+        connections.erase(addr);
     }
     
     // SSL shutdown, close socket
@@ -205,23 +205,67 @@ void TLS<RecvMsg, SendMsg>::threadListen(const std::string senderReadableAddr, c
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::broadcast(const SendMsg& payload) {
     std::shared_lock lock(connectionsMutex);
-    for (const auto& [name, ssl] : connections) {
+    for (const auto& [addr, ssl] : connections) {
         try {
             send(payload, ssl);
         }
-        catch (const std::exception& e) {} //TODO: What to do when broadcast fails?
+        catch (const std::exception& e) {} // If it's an actual connection failure, the recv will eventually fail
+    }
+}
+
+template <class RecvMsg, class SendMsg>
+void TLS<RecvMsg, SendMsg>::broadcast(const SendMsg& payload, const addresses& dests) {
+    std::shared_lock lock(connectionsMutex);
+    for (const std::string& addr : dests) {
+        // send to address if the connection exists
+        auto& index = connections.find(addr);
+        if (index != connections.end()) {
+            try {
+                send(payload, index->second);
+            }
+            catch (const std::exception& e) {} // If it's an actual connection failure, the recv will eventually fail
+        }
+    }
+}
+
+template <class RecvMsg, class SendMsg>
+void TLS<RecvMsg, SendMsg>::sendRoundRobin(const SendMsg& payload, const addresses& dests) {
+    std::shared_lock lock(connectionsMutex);
+
+    if (roundRobinIndex >= dests.size())
+        roundRobinIndex = 0;
+    // send to address if the connection exists
+    auto& index = connections.find(dests[roundRobinIndex]);
+    if (index != connections.end()) {
+        try {
+            send(payload, index->second);
+        }
+        catch (const std::exception& e) {} // If it's an actual connection failure, the recv will eventually fail
+    }
+    roundRobinIndex += 1;
+}
+
+template <class RecvMsg, class SendMsg>
+void TLS<RecvMsg, SendMsg>::newNetwork(const networkConfig& netConf) {
+    // Connect to new nodes. Don't need to shut down old ones (they should die naturally).
+    // Lower-numbered peers connect to higher-numbered peers
+    if (remoteType == Replica) {
+        for (auto& [peerId, peerIp] : netConf) {
+            if (ownType == Client || (ownType == Replica && peerId > this->id))
+                std::thread(&TLS::connectToServer, this, peerId, peerIp).detach();
+        }
     }
 }
 
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::loadOwnCertificates(SSL_CTX *ctx) {
     /* Set the key and cert */
-    if (SSL_CTX_use_certificate_file(ctx, (path + "/" + netConf[myID].name + "_cert.pem").c_str(), SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_certificate_file(ctx, (path + "/" + name + "_cert.pem").c_str(), SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
 
-    if (SSL_CTX_use_PrivateKey_file(ctx, (path + "/" + netConf[myID].name + "_key.pem").c_str(), SSL_FILETYPE_PEM) <= 0) {
+    if (SSL_CTX_use_PrivateKey_file(ctx, (path + "/" + name + "_key.pem").c_str(), SSL_FILETYPE_PEM) <= 0) {
         ERR_print_errors_fp(stderr);
         exit(EXIT_FAILURE);
     }
@@ -229,9 +273,8 @@ void TLS<RecvMsg, SendMsg>::loadOwnCertificates(SSL_CTX *ctx) {
 
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::loadAcceptableCertificates(SSL_CTX *ctx) {
-    for (const peer& addr : netConf) {
-        SSL_CTX_load_verify_locations(ctx, (path + "/" + addr.name + "_cert.pem").c_str(), NULL);
-    }
+    // All certificates in the right directory will be used
+    SSL_CTX_load_verify_dir(ctx, path.c_str());
 }
 
 template <class RecvMsg, class SendMsg>
@@ -329,7 +372,7 @@ std::string TLS<RecvMsg, SendMsg>::errorMessage(const std::errc errorCode) {
 }
 
 template <class RecvMsg, class SendMsg>
-void TLS<RecvMsg, SendMsg>::disableNaglesAlgorithm(int sock) {
+void TLS<RecvMsg, SendMsg>::disableNaglesAlgorithm(const int sock) {
     int flag = 1;
     int result = setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
     if (result < 0) {

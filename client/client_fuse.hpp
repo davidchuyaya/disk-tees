@@ -13,9 +13,14 @@
 class ClientFuse : public Fusepp::Fuse<ClientFuse>
 {
 public:
-    ClientFuse(const std::string& redirectPoint, const int quorum);
+    ClientFuse(const bool network, const ballot r, const std::string& redirectPoint, const int quorum, const addresses& config);
     void addTLS(TLS<replicaMsg, clientMsg> *tls);
-    void onRecvMsg(const replicaMsg& msg, SSL* sender);
+    // Visitor pattern: https://www.cppstories.com/2018/09/visit-variants/. One for every possible type in replicaMsg
+    void operator()(const p1b& msg); // TODO: implement
+    void operator()(const disk& msg); // TODO: implement
+    void operator()(const p2b& msg); // TODO: implement
+    void operator()(const fsyncMissing& msg); // TODO: implement
+    void operator()(const fsyncAck& msg);
 
     static void *client_init(fuse_conn_info *conn, fuse_config *cfg);
     static int client_getattr(const char *path, struct stat *stbuf, fuse_file_info *fi);
@@ -62,18 +67,26 @@ public:
 private:
     // Because all functions are static, ClientFuse can't carry state except by having static variables
     // inline static: See https://stackoverflow.com/a/62915890/4028758
-    inline static TLS<replicaMsg, clientMsg> *replicaTLS;
-    inline static int written;
-    inline static round r;
-    // Directory to redirect writes to. Since we're passing through all disk operations, this is necessary to prevent retriggering FUSE in the same directory
-    inline static std::string redirectPoint;
-    inline static std::mutex replicaRecvMutex;
-    inline static int replicasCommitted;
-    //TODO: Clear on reconfiguration. Also needs to pause all other writes on reconfiguration
-    inline static std::map<int, int> replicaWritten;
+    // 1. Constants
+    inline static bool network;
     inline static int quorum;
-    inline static std::mutex fsyncMutex;
+    inline static TLS<replicaMsg, clientMsg> *replicaTLS;
+    inline static std::string redirectPoint; // Directory to redirect writes to. Since we're passing through all disk operations, this is necessary to prevent retriggering FUSE in the same directory
+    // 2. State
+    inline static int written;
+    inline static ballot r;
+    // 3. State that can change based on replica responses, so must be protected by mutex
+    inline static std::mutex replicaRecvMutex; // Note: No need to use shared_mutex because we run FUSE single-threaded, and FUSE is the only reader
+    inline static std::vector<clientMsg> uncommittedWrites;
+    inline static int replicasCommitted; // The largest sequence number for which replicas committed
+    inline static std::map<int, int> replicaWritten; // Map from ID to largest sequence number for each replica
     inline static std::condition_variable fsyncCommitted;
+    // 5. Mutex waiting for reconfiguration to complete
+    inline static std::mutex reconfigMutex;
+    inline static std::condition_variable reconfigComplete;
+    inline static bool isReconfiguring;
+    inline static addresses config;
 
     static fuse_file_info_lite make_lite(fuse_file_info *fi);
+    static void preWriteCheck();
 };

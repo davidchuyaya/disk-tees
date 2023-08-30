@@ -8,7 +8,9 @@
 #include <variant>
 #include <cerrno>
 #include <cstring>
+#include <ranges>
 #include "replica_fuse.hpp"
+#include "../shared/ccf_network.hpp"
 
 // If defined, will write files to the directory specified below. Used for testing locally.
 #define REPLICA_CUSTOM_DIR
@@ -18,10 +20,11 @@
 #define REPLICA_PREPEND_PATH(path) (path)
 #endif
 
-ReplicaFuse::ReplicaFuse(const int id, const std::string& directory) : id(id), directory(directory) {
+ReplicaFuse::ReplicaFuse(const int id, const std::string& name, const std::string& directory, const networkConfig& ccf, const std::string& path) :
+    id(id), name(name), directory(directory), ccf(ccf), path(path) {
 }
 
-void ReplicaFuse::addTLS(TLS<clientMsg, replicaMsg>* tls) {
+void ReplicaFuse::addClientTLS(TLS<clientMsg, replicaMsg>* tls) {
     this->clientTLS = tls;
 }
 
@@ -253,11 +256,18 @@ void ReplicaFuse::operator()(const releaseParams& params) {
 
 void ReplicaFuse::operator()(const fsyncParams& params) {
     // Can't use standard preWriteCheck, since we want to add this to pendingFsyncs instead of pendingWrites
-    // Code is mostly copy pasted from pendingWrites though
-    if (params.r != normalRound || params.r < highestRound)
+    // Code is mostly copy pasted from preWriteCheck though
+    if (params.r < highestBallot) {
+        std::cout << "Attempted fsync with ballot " << params.r << " when highestBallot is " << highestBallot << std::endl;
         return;
-    // TODO: If r > normalRound and r >= highestRound, might want to cache the write and wait for p2a with that ballot to conclude
+    }
+    if (params.r != normalBallot) {
+        std::cout << "Storing fsync with ballot " << params.r << " because current normalBallot is too low: " << normalBallot << std::endl;
+        pendingFsyncs[params.seq] = params;
+        return;
+    }
     if (params.seq > written) {
+        std::cout << "Fsync arrived for seq " << params.seq << " and written is not high enough yet: " << written << std::endl;
         pendingFsyncs[params.seq] = params;
         return;
     }
@@ -325,18 +335,67 @@ void ReplicaFuse::operator()(const copyFileRangeParams &params) {
     postWriteCheck(params.seq);
 }
 
-bool ReplicaFuse::preWriteCheck(const int seq, const round& r, const clientMsg& msg) {
-    if (r != normalRound || r < highestRound) {
-        std::cout << "Attempted write with round " << r << " when normalRound is " << normalRound << " and highestRound is " << highestRound << std::endl;
+void ReplicaFuse::operator()(const p1a& msg) {
+    if (msg.r < highestBallot)
+        return;
+    
+    highestBallot = msg.r;
+    // Reply to client
+    clientTLS->broadcast(p1b {
+        .id = id,
+        .clientBallot = msg.r,
+        .written = written,
+        .normalBallot = normalBallot,
+        .highestBallot = highestBallot
+    });
+
+    // Connect to replicas in the new config
+    // 1. Remove self from list of replicas in config (so we don't send to ourselves)
+    networkConfig netConfWithoutSelf = msg.netConf;
+    netConfWithoutSelf.erase(id);
+
+    // 2. Ask CCF for replicas' certificates. Note if we already have the certificate, getCert won't ask CCF.
+    CCFNetwork ccfNetwork(ccf);
+    for (auto& [peerId, addr] : netConfWithoutSelf) {
+        ccfNetwork.getCert(peerId, "replica" + std::to_string(peerId), "replica");
+    }
+
+    // 3. Connect to replicas
+    if (replicaTLS == nullptr) {
+        replicaTLS = new TLS<clientMsg, clientMsg>(id, name, Replica, Replica, netConfWithoutSelf, path,
+            [&](const clientMsg& payload, const std::string& addr, SSL* sender) {
+                std::unique_lock<std::mutex> lock(allMutex);
+                shouldBroadcast = false; // Don't broadcast messages if we got it from another replica (it was broadcast by them)
+                std::visit(*this, payload);
+        });
+    }
+    replicas = NetworkConfig::configToAddrs(Replica, netConfWithoutSelf);
+    replicaTLS->newNetwork(netConfWithoutSelf);
+}
+
+/**
+ * Helper functions
+*/
+
+bool ReplicaFuse::preWriteCheck(const int seq, const ballot& r, const clientMsg& msg) {
+    if (r < highestBallot) {
+        std::cout << "Attempted write with ballot " << r << " when highestBallot is " << highestBallot << std::endl;
         return false;
     }
-    // TODO: If r > normalRound and r >= highestRound, might want to cache the write and wait for p2a with that ballot to conclude
+    if (r != normalBallot) {
+        std::cout << "Storing write with ballot " << r << " because current normalBallot is too low: " << normalBallot << std::endl;
+        pendingWrites[seq] = msg; 
+        return false;
+    }
     if (seq != written + 1) {
-        pendingWrites[seq] = msg;
         std::cout << "Attempted write at seq " << seq << " when written is " << written << std::endl;
+        pendingWrites[seq] = msg;
         return false;
     }
-    // TODO: Broadcast to other replicas
+    // Broadcast to other replicas
+    if (shouldBroadcast && replicaTLS != nullptr) {
+        replicaTLS->broadcast(msg, replicas);
+    }
     return true;
 }
 

@@ -1,6 +1,9 @@
 #!/bin/bash
+#
+# Attempt to download a certificate from CCF, retrying until successful
+#
 print_usage() {
-    echo "Usage: $0 -i <ID> -n <name>"
+    echo "Usage: $0 -a <address> -i <ID> -n <name> -t <type>"
 }
 
 if (( $# == 0 )); then
@@ -8,29 +11,43 @@ if (( $# == 0 )); then
     exit 1
 fi
 
-while getopts 'i:n:' flag; do
+while getopts 'a:i:n:' flag; do
   case ${flag} in
+    a) ADDRESS=${OPTARG} ;;
     i) ID=${OPTARG} ;;
     n) NAME=${OPTARG} ;;
+    t) TYPE=${OPTARG} ;;
     *) print_usage
        exit 1;;
   esac
 done
 
-# Retry until a certificate is received
-RECEIVED_CERT=false
-while true; do
-  JSON=$(curl https://127.0.0.1:8000/matchmaker/getcert -X POST --cacert service_cert.pem --cert user0_cert.pem --key user0_privk.pem -H "Content-Type: application/json" --data-binary '{"id": '"$ID"'}')
-  RECEIVED_CERT=$(jq 'has("cert")' <<< $JSON)
-  if [ "$RECEIVED_CERT" = true ]; then
-    break
+
+OUTPUT=get_cert.json
+CERT_NAME=${NAME}_cert.pem
+
+if [ -f $CERT_NAME ]; then
+  echo "Certificate already exists: $CERT_NAME"
+  exit 0
+fi
+
+while true
+do
+  # -m 60 = Time out after 60 seconds
+  curl https://${ADDRESS}/matchmaker/getcert -X POST --cacert service_cert.pem --cert user0_cert.pem --key user0_privk.pem -m 60 -H "Content-Type: application/json" --data-binary '{"id": '"$ID"', "type": "'"$TYPE"'"}' -o $OUTPUT
+  if [ $? -eq 0 ]; then
+    SUCCESS=$(jq '.success' $OUTPUT)
+    if [ $SUCCESS == "true" ]; then
+      break
+    fi
   fi
-  # Wait before retrying
+  echo "Failed to get cert, retrying in 5s..."
   sleep 5
 done
 
 # Parse output
-CERT64=$(jq -r '.cert' <<< $JSON)
+CERT64=$(jq -r '.cert' $OUTPUT)
 CERT=$(echo $CERT64 | base64 -d)
 # Need quotes around $CERT to preserve newlines: https://stackoverflow.com/a/22101842/4028758
-echo "$CERT" > ${NAME}_cert.pem
+echo "$CERT" > $CERT_NAME
+echo "Successfully downloaded cert for id: $ID, name: $NAME"
