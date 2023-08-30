@@ -272,7 +272,7 @@ void ReplicaFuse::operator()(const fsyncParams& params) {
         return;
     }
     // Reply to client to confirm commit
-    replicaMsg msg {
+    fsyncAck msg {
         .id = id,
         .written = written,
         .r = params.r
@@ -371,6 +371,14 @@ void ReplicaFuse::operator()(const p1a& msg) {
     }
     replicas = NetworkConfig::configToAddrs(Replica, netConfWithoutSelf);
     replicaTLS->newNetwork(netConfWithoutSelf);
+}
+
+void ReplicaFuse::operator()(const diskReq& msg) {
+    // TODO: Implement
+}
+
+void ReplicaFuse::operator()(const p2a& msg) {
+    // TODO: Implement
 }
 
 /**

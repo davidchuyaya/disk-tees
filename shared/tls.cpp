@@ -33,7 +33,7 @@ static const int REPLICA_START_PORT = 10100;
 
 template <class RecvMsg, class SendMsg>
 TLS<RecvMsg, SendMsg>::TLS(const int id, const std::string name, const NodeType remoteType, const NodeType ownType,
-    const networkConfig netConf, const std::string path, const std::function<void(RecvMsg, std::string, SSL*)> onRecv) :
+    const networkConfig netConf, const std::string path, const std::function<void(const RecvMsg&, const std::string&, SSL*)> onRecv) :
         id(id), name(name), remoteType(remoteType), ownType(ownType), path(path), onRecv(onRecv) {
     newNetwork(netConf);
     // Start server asynchronously
@@ -218,7 +218,7 @@ void TLS<RecvMsg, SendMsg>::broadcast(const SendMsg& payload, const addresses& d
     std::shared_lock lock(connectionsMutex);
     for (const std::string& addr : dests) {
         // send to address if the connection exists
-        auto& index = connections.find(addr);
+        auto index = connections.find(addr);
         if (index != connections.end()) {
             try {
                 send(payload, index->second);
@@ -235,7 +235,7 @@ void TLS<RecvMsg, SendMsg>::sendRoundRobin(const SendMsg& payload, const address
     if (roundRobinIndex >= dests.size())
         roundRobinIndex = 0;
     // send to address if the connection exists
-    auto& index = connections.find(dests[roundRobinIndex]);
+    auto index = connections.find(dests[roundRobinIndex]);
     if (index != connections.end()) {
         try {
             send(payload, index->second);
@@ -274,7 +274,7 @@ void TLS<RecvMsg, SendMsg>::loadOwnCertificates(SSL_CTX *ctx) {
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::loadAcceptableCertificates(SSL_CTX *ctx) {
     // All certificates in the right directory will be used
-    SSL_CTX_load_verify_dir(ctx, path.c_str());
+    SSL_CTX_load_verify_locations(ctx, NULL, path.c_str());
 }
 
 template <class RecvMsg, class SendMsg>

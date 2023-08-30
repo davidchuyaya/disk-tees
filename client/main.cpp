@@ -72,11 +72,11 @@ int main(int argc, char* argv[]) {
     addresses replicas = NetworkConfig::configToAddrs(Replica, replicaConf);
     int quorum = replicaConf.size() / 2 + 1;
     std::string name = "client" + std::to_string(config.id);
+    
     ClientFuse fuse(config.network, matchmakeResult.r, getRedirectPoint(), quorum, replicas);
     TLS<replicaMsg, clientMsg> replicaTLS(config.id, name, Replica, Client, replicaConf, path,
         [&](const replicaMsg& payload, const std::string& addr, SSL* sender) {
-            
-            fuse.onRecvMsg(payload, sender);
+            std::visit(fuse, payload);
     });
     fuse.addTLS(&replicaTLS);
     // 3. Broadcast p1as

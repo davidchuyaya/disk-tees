@@ -37,6 +37,18 @@ void ClientFuse::operator()(const p1b& msg) {
 	std::unique_lock<std::mutex> lock(replicaRecvMutex);
 }
 
+void ClientFuse::operator()(const disk& msg) {
+	// TODO: Implement
+}
+
+void ClientFuse::operator()(const p2b& msg) {
+	// TODO: Implement
+}
+
+void ClientFuse::operator()(const fsyncMissing& msg) {
+	// TODO: Implement
+}
+
 void ClientFuse::operator()(const fsyncAck& msg) {
 	// Obtain lock, since connections to replicas are multithreaded
 	std::unique_lock<std::mutex> lock(replicaRecvMutex);

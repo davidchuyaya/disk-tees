@@ -33,6 +33,8 @@ public:
     void operator()(const removexattrParams& params);
     void operator()(const copyFileRangeParams& params);
     void operator()(const p1a& msg);
+    void operator()(const diskReq& msg);
+    void operator()(const p2a& msg);
     std::mutex allMutex; // Must acquire lock before executing any function, since all writes check the ballot, which can be changed by p1a/p2a, and all writes impact disk, which can be overwritten by p2a
     bool shouldBroadcast; // Should be set before executing any function. Tells the replica whether or not to broadcast this message to other replicas
 

@@ -8,6 +8,7 @@
 #define FUSE_USE_VERSION 31
 #endif
 #include <fuse.h>
+#include "network_config.hpp"
 
 struct ballot {
     int ballotNum = 0;

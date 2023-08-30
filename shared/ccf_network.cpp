@@ -73,7 +73,7 @@ matchB CCFNetwork::sendMatchA(const ballot r, const networkConfig config) {
         file.open(MATCH_OUTPUT_FILE);
         json data = json::parse(file);
         output.r = ballotFromString(data["ballot"]);
-        for (auto& configString : data["config"]) {
+        for (const std::string& configString : data["config"]) {
             json config = json::parse(configString);
             output.configs.emplace_back(config);
         }
