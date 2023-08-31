@@ -14,6 +14,7 @@
 #include <iostream>
 #include <signal.h>
 #include <sys/socket.h>
+#include <sys/fcntl.h>
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
 #include <openssl/ssl.h>
@@ -26,19 +27,14 @@
 #include "zpp_bits.h"
 #include "tls.hpp"
 
-static const int CONNECTION_RETRY_TIMEOUT_SEC = 5;
-static const int READ_BUFFER_SIZE = 8192;
-static const int CLIENT_START_PORT = 10000;
-static const int REPLICA_START_PORT = 10100;
+static const int CONNECTION_RETRY_TIMEOUT_SEC = 1;
 
 template <class RecvMsg, class SendMsg>
-TLS<RecvMsg, SendMsg>::TLS(const int id, const std::string name, const NodeType remoteType, const NodeType ownType,
-    const networkConfig netConf, const std::string path, const std::function<void(const RecvMsg&, const std::string&, SSL*)> onRecv) :
-        id(id), name(name), remoteType(remoteType), ownType(ownType), path(path), onRecv(onRecv) {
-    newNetwork(netConf);
-    // Start server asynchronously
+TLS<RecvMsg, SendMsg>::TLS(const int id, const std::string name, const NodeType remoteType, const NodeType ownType, const networkConfig netConf, const std::string path, const std::function<void(const RecvMsg&, const std::string&, SSL*)> onRecv) : id(id), name(name), remoteType(remoteType), ownType(ownType), path(path), onRecv(onRecv) {
     if (ownType == Replica)
-        std::thread(&TLS::startServer, this).detach();
+        startServer();
+
+    newNetwork(netConf);
 }
 
 template <class RecvMsg, class SendMsg>
@@ -47,10 +43,10 @@ void TLS<RecvMsg, SendMsg>::startServer()
     // Ignore broken pipe signals
     signal(SIGPIPE, SIG_IGN);
 
-    SSL_CTX *ctx = SSL_CTX_new(TLS_server_method());
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
-    loadAcceptableCertificates(ctx);
-    loadOwnCertificates(ctx);
+    serverCtx = SSL_CTX_new(TLS_server_method());
+    SSL_CTX_set_verify(serverCtx, SSL_VERIFY_PEER, NULL);
+    loadAcceptableCertificates(serverCtx);
+    loadOwnCertificates(serverCtx);
 
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
@@ -59,6 +55,7 @@ void TLS<RecvMsg, SendMsg>::startServer()
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     disableNaglesAlgorithm(sock);
+    setNonBlocking(sock);
 
     if (bind(sock, (struct sockaddr*)&addr, sizeof(addr)) < 0) {
         std::cerr << "Unable to bind" << std::endl;
@@ -71,54 +68,61 @@ void TLS<RecvMsg, SendMsg>::startServer()
 
     std::cout << "Started server" << std::endl;
 
-    while (true) {
-        sockaddr_in sockAddr;
-        unsigned int len = sizeof(sockAddr);
+    serverSocket = sock;
+    openSockets.emplace_back(pollfd{sock, POLLIN, 0});
+}
 
-        int client = accept(sock, (struct sockaddr*)&sockAddr, &len);
-        if (client < 0) {
+template <class RecvMsg, class SendMsg>
+int TLS<RecvMsg, SendMsg>::acceptConnection() {
+    sockaddr_in sockAddr;
+    unsigned int len = sizeof(sockAddr);
+
+    int client = accept(serverSocket, (struct sockaddr*)&sockAddr, &len);
+    if (client < 0) {
+        if (errno != EWOULDBLOCK && errno != EAGAIN)
             std::cerr << "Unable to accept" << std::endl;
-            continue;
-        }
-
-        std::cout << "Client TCP connection accepted" << std::endl;
-
-        SSL *ssl = SSL_new(ctx);
-        SSL_set_fd(ssl, client);
-
-        if (SSL_accept(ssl) <= 0) {
-            ERR_print_errors_fp(stderr);
-            continue;
-        }
-
-        std::cout << "Client SSL connection accepted" << std::endl;
-
-        // Add connection to map
-        const std::string addr = readableAddr(sockAddr);
-        {
-            std::unique_lock lock(connectionsMutex);
-            connections.emplace(addr, ssl);
-        }
-
-        // Listen to the client on an async thread
-        std::thread connectionThread = std::thread(&TLS::threadListen, this, addr, ssl);
-        connectionThread.detach();
+        return -1;
     }
 
-    // close server
-    close(sock);
-    SSL_CTX_free(ctx);
+    std::cout << "Client TCP connection accepted" << std::endl;
+
+    SSL *ssl = SSL_new(serverCtx);
+    SSL_set_fd(ssl, client);
+
+    // Block until connection is complete
+    int rc = 0;
+    while (rc <= 0) {
+        rc = SSL_accept(ssl);
+        bool success = blockOnErr(client, ssl, rc);
+        if (!success) {
+            ERR_print_errors_fp(stderr);
+            return -1;
+        }
+    }
+
+    std::cout << "Client SSL connection accepted" << std::endl;
+
+    // Add connection to maps
+    std::string addr = readableAddr(sockAddr);
+    sslFromAddr[addr] = ssl;
+    sslFromSocket[client] = ssl;
+    addrFromSocket[client] = addr;
+    socketFromAddr[addr] = client;
+
+    return client;
 }
 
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::connectToServer(const int peerId, const std::string& peerIp) {
-    SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
+    SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
     loadAcceptableCertificates(ctx);
     loadOwnCertificates(ctx);
 
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     disableNaglesAlgorithm(sock);
+    setNonBlocking(sock);
+
     sockaddr_in sockAddr;
     sockAddr.sin_family = AF_INET;
     int port = NetworkConfig::getPort(remoteType, peerId);
@@ -132,82 +136,100 @@ void TLS<RecvMsg, SendMsg>::connectToServer(const int peerId, const std::string&
 
     std::string addr = peerIp + ":" + std::to_string(port);
 
-    while (true) {
-        // code for connection is in a loop so we automatically attempt to reconnect
-        while (connect(sock, (struct sockaddr*) &sockAddr, sizeof(sockAddr)) != 0) {
-            std::cout << "Unable to TCP connect to server " << addr << ", retrying in " << CONNECTION_RETRY_TIMEOUT_SEC << "s..." << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_TIMEOUT_SEC));
-        }
-        std::cout << "TCP connection to server successful" << std::endl;
+    // Attempt to connect forever
+    while (connect(sock, (struct sockaddr*) &sockAddr, sizeof(sockAddr)) != 0) {
+        std::cout << "Unable to TCP connect to server " << addr << ", retrying in " << CONNECTION_RETRY_TIMEOUT_SEC << "s..." << std::endl;
+        std::this_thread::sleep_for(std::chrono::seconds(CONNECTION_RETRY_TIMEOUT_SEC));
+    }
+    std::cout << "TCP connection to server successful" << std::endl;
 
-        if (SSL_connect(ssl) <= 0) {
+    // Block until connection is complete
+    int rc = 0;
+    while (rc <= 0) {
+        rc = SSL_connect(ssl);
+        bool success = blockOnErr(sock, ssl, rc);
+        if (!success) {
+            std::cout << "Failed to connect to server" << std::endl;
             ERR_print_errors_fp(stderr);
-            break;
+            return;
         }
-        std::cout << "SSL connection to server successful" << std::endl;
+    }
+    
+    std::cout << "SSL connection to server successful" << std::endl;
 
-        // Add connection to map
-        {
-            std::unique_lock lock(connectionsMutex);
-            connections.emplace(addr, ssl);
+    // Add connection to maps
+    sslFromAddr[addr] = ssl;
+    sslFromSocket[sock] = ssl;
+    addrFromSocket[sock] = addr;
+    socketFromAddr[addr] = sock;
+
+    openSockets.emplace_back(pollfd{sock, POLLIN, 0});
+}
+
+
+template <class RecvMsg, class SendMsg>
+void TLS<RecvMsg, SendMsg>::runEventLoopOnce(const int timeout) {
+    int rc = poll(openSockets.data(), openSockets.size(), timeout);
+
+    std::vector<int> newSockets;
+    std::vector<int> deletedSocketIndices;
+    for (int i = 0; i < openSockets.size(); i++) {
+        pollfd& sock = openSockets[i];
+
+        if (sock.revents == 0)
+            continue;
+        
+        // Server listens for connections
+        if (sock.fd == serverSocket) {
+            int client = acceptConnection();
+            if (client != -1)
+                newSockets.emplace_back(client);
         }
-
-        /* Loop to send input from keyboard */
-        char readBuffer[READ_BUFFER_SIZE];
-        try {
-            while (true) {
-                RecvMsg recvPayload = recv(readBuffer, ssl);
-                onRecv(recvPayload, addr, ssl);
+        else {
+            // Listen to socket
+            try {
+                SSL* ssl = sslFromSocket.at(sock.fd);
+                RecvMsg recvPayload = recv(sock.fd, ssl);
+                onRecv(recvPayload, addrFromSocket.at(sock.fd), ssl);
+            }
+            catch (const std::exception& e) { // on exception, close connection
+                memset(readBuffer, 0, READ_BUFFER_SIZE); // Clear read buffer in case it's corrupted
+                std::cout << e.what() << std::endl;
+                closeSocket(sock.fd);
+                deletedSocketIndices.emplace_back(i);
             }
         }
-        catch (const std::exception& e) { // on exception, close connection
-            std::cerr << e.what() << std::endl;
-        }
     }
 
-    // Remove the connection from the map
-    {
-        std::unique_lock lock(connectionsMutex);
-        connections.erase(addr);
+    // Modify openSockets
+    for (int i = deletedSocketIndices.size() - 1; i >= 0; i--) {
+        int index = deletedSocketIndices[i];
+        openSockets.erase(openSockets.begin() + index);
     }
+    for (int sock : newSockets)
+        openSockets.emplace_back(pollfd{sock, POLLIN, 0});
 
-    SSL_shutdown(ssl);
-    SSL_free(ssl);
-    close(SSL_get_fd(ssl));
-    SSL_CTX_free(ctx);
 }
 
 template <class RecvMsg, class SendMsg>
-void TLS<RecvMsg, SendMsg>::threadListen(const std::string& addr, SSL* sender) {
-    char readBuffer[READ_BUFFER_SIZE];
-    try {
-        while (true) {
-            RecvMsg recvPayload = recv(readBuffer, sender);
-            onRecv(recvPayload, addr, sender);
-        }
-    }
-    catch (const std::exception& e) { // on exception, close connection
-        std::cerr << e.what() << std::endl;
-    }
+void TLS<RecvMsg, SendMsg>::closeSocket(const int sock) {
+    std::string& addr = addrFromSocket[sock];
+    sslFromAddr.erase(addr);
+    addrFromSocket.erase(sock);
+    socketFromAddr.erase(addr);
+    SSL* ssl = sslFromSocket[sock];
+    sslFromSocket.erase(sock);
 
-    // Remove the connection from the map
-    {
-        std::unique_lock lock(connectionsMutex);
-        connections.erase(addr);
-    }
-    
-    // SSL shutdown, close socket
-    SSL_shutdown(sender);
-    SSL_free(sender);
-    close(SSL_get_fd(sender));
+    SSL_shutdown(ssl);
+    SSL_free(ssl);
+    close(sock);
 }
 
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::broadcast(const SendMsg& payload) {
-    std::shared_lock lock(connectionsMutex);
-    for (const auto& [addr, ssl] : connections) {
+    for (const auto& [addr, sock] : socketFromAddr) {
         try {
-            send(payload, ssl);
+            send(payload, addr);
         }
         catch (const std::exception& e) {} // If it's an actual connection failure, the recv will eventually fail
     }
@@ -215,13 +237,11 @@ void TLS<RecvMsg, SendMsg>::broadcast(const SendMsg& payload) {
 
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::broadcast(const SendMsg& payload, const addresses& dests) {
-    std::shared_lock lock(connectionsMutex);
     for (const std::string& addr : dests) {
         // send to address if the connection exists
-        auto index = connections.find(addr);
-        if (index != connections.end()) {
+        if (sslFromAddr.contains(addr)) {
             try {
-                send(payload, index->second);
+                send(payload, addr);
             }
             catch (const std::exception& e) {} // If it's an actual connection failure, the recv will eventually fail
         }
@@ -230,19 +250,21 @@ void TLS<RecvMsg, SendMsg>::broadcast(const SendMsg& payload, const addresses& d
 
 template <class RecvMsg, class SendMsg>
 void TLS<RecvMsg, SendMsg>::sendRoundRobin(const SendMsg& payload, const addresses& dests) {
-    std::shared_lock lock(connectionsMutex);
-
-    if (roundRobinIndex >= dests.size())
-        roundRobinIndex = 0;
-    // send to address if the connection exists
-    auto index = connections.find(dests[roundRobinIndex]);
-    if (index != connections.end()) {
-        try {
-            send(payload, index->second);
+    while (true) {
+        if (roundRobinIndex >= dests.size())
+            roundRobinIndex = 0;
+        // send to address if the connection exists
+        std::string addr = dests[roundRobinIndex];
+        if (sslFromAddr.contains(addr)) {
+            try {
+                send(payload, addr);
+                return;
+            }
+            catch (const std::exception& e) {} // If it's an actual connection failure, the recv will eventually fail
         }
-        catch (const std::exception& e) {} // If it's an actual connection failure, the recv will eventually fail
+        // Otherwise, try with the next address
+        roundRobinIndex += 1;
     }
-    roundRobinIndex += 1;
 }
 
 template <class RecvMsg, class SendMsg>
@@ -252,7 +274,7 @@ void TLS<RecvMsg, SendMsg>::newNetwork(const networkConfig& netConf) {
     if (remoteType == Replica) {
         for (auto& [peerId, peerIp] : netConf) {
             if (ownType == Client || (ownType == Replica && peerId > this->id))
-                std::thread(&TLS::connectToServer, this, peerId, peerIp).detach();
+                connectToServer(peerId, peerIp);
         }
     }
 }
@@ -285,7 +307,7 @@ std::string TLS<RecvMsg, SendMsg>::readableAddr(const sockaddr_in& addr) {
 }
 
 template <class RecvMsg, class SendMsg>
-void TLS<RecvMsg, SendMsg>::send(const SendMsg& payload, SSL* dest) {
+void TLS<RecvMsg, SendMsg>::send(const SendMsg& payload, const std::string& addr) {
     auto [sendData, out] = zpp::bits::data_out();
     auto serializeResult = out(payload);
     if (zpp::bits::failure(serializeResult)) {
@@ -293,27 +315,24 @@ void TLS<RecvMsg, SendMsg>::send(const SendMsg& payload, SSL* dest) {
         return;
     }
 
+    int sock = socketFromAddr.at(addr);
+    SSL* dest = sslFromAddr.at(addr);
     // 1. Send the size of the data
     int dataSize = sendData.size();
-    if (SSL_write(dest, &dataSize, sizeof(dataSize)) <= 0)
-        throw std::runtime_error("Connection closed on SSL_write");
+    blockingWrite(sock, dest, &dataSize, sizeof(dataSize));
     // 2. Send the data
-    if (SSL_write(dest, sendData.data(), dataSize) <= 0)
-        throw std::runtime_error("Connection closed on SSL_write");
+    blockingWrite(sock, dest, sendData.data(), dataSize);
 }
 
 template <class RecvMsg, class SendMsg>
-RecvMsg TLS<RecvMsg, SendMsg>::recv(std::span<char> buffer, SSL* src) {
+RecvMsg TLS<RecvMsg, SendMsg>::recv(const int sock, SSL* src) {
     int readLen;
     int dataSize;
-
     // 1. Read the size of the data
-    readLen = SSL_read(src, &dataSize, sizeof(dataSize));
-    if (readLen <= 0)
-        throw std::runtime_error("Connection closed on SSL_read");
+    blockingRead(sock, src, (char*)&dataSize, sizeof(dataSize));
     // 2. Read the data.
     // Check whether we can use the existing buffer to read
-    bool needNewBuffer = dataSize > buffer.size();
+    bool needNewBuffer = dataSize > READ_BUFFER_SIZE;
     std::span<char> actualBuffer;
     std::unique_ptr<char[]> biggerBuffer; // use a unique pointer to store larger buffer so it gets freed if we exit by throwing an exception
     if (needNewBuffer) {
@@ -321,15 +340,9 @@ RecvMsg TLS<RecvMsg, SendMsg>::recv(std::span<char> buffer, SSL* src) {
         actualBuffer = {biggerBuffer.get(), (size_t) dataSize};
     }   
     else
-        actualBuffer = buffer;
+        actualBuffer = readBuffer;
     // Keep reading until everything has been received.
-    int readSoFar = 0;
-    while (readSoFar < dataSize) {
-        readLen = SSL_read(src, actualBuffer.data() + readSoFar, dataSize - readSoFar);
-        if (readLen <= 0)
-            throw std::runtime_error("Connection closed on SSL_read");
-        readSoFar += readLen;
-    }
+    blockingRead(sock, src, actualBuffer.data(), dataSize);
     
     zpp::bits::in in(actualBuffer);
     RecvMsg recvPayload;
@@ -337,11 +350,62 @@ RecvMsg TLS<RecvMsg, SendMsg>::recv(std::span<char> buffer, SSL* src) {
     if (zpp::bits::failure(deserializeResult))
         throw std::runtime_error("Unable to deserialize payload, error: " + errorMessage(deserializeResult));
 
-    // Free memory or reset bits in buffer
+    // Reset bits in buffer
     if (!needNewBuffer)
-        memset(buffer.data(), 0, dataSize);
+        memset(readBuffer, 0, dataSize);
 
     return recvPayload;
+}
+
+template <class RecvMsg, class SendMsg>
+void TLS<RecvMsg, SendMsg>::blockingWrite(const int sock, SSL* ssl, const void* buffer, const int bytes) {
+    int rc = 0;
+    while (rc <= 0) {
+        rc = SSL_write(ssl, buffer, bytes);
+        if (rc <= 0) {
+            // block and retry
+            bool success = blockOnErr(sock, ssl, rc);
+            if (!success)
+                throw std::runtime_error("Connection closed on SSL_write");
+        }
+    }
+}
+
+template <class RecvMsg, class SendMsg>
+void TLS<RecvMsg, SendMsg>::blockingRead(const int sock, SSL* ssl, char* buffer, const int bytes) {
+    int readSoFar = 0;
+    while (readSoFar < bytes) {
+        int readLen = SSL_read(ssl, buffer + readSoFar, bytes - readSoFar);
+        if (readLen <= 0) {
+            // block and retry
+            bool success = blockOnErr(sock, ssl, readLen);
+            if (!success)
+                throw std::runtime_error("Connection closed on SSL_read");
+        }
+        else
+            readSoFar += readLen;
+    }
+}
+
+template <class RecvMsg, class SendMsg>
+bool TLS<RecvMsg, SendMsg>::blockOnErr(const int sock, SSL* ssl, const int rc) {
+    int err = SSL_get_error(ssl, rc);
+    if (err == SSL_ERROR_NONE)
+        return true;
+    else if (err == SSL_ERROR_WANT_READ) {
+        pollfd fds[1] {pollfd{sock, POLLIN, 0}};
+        poll(fds, 1, -1);
+        return true;
+    }
+    else if (err == SSL_ERROR_WANT_WRITE) {
+        pollfd fds[1] {pollfd{sock, POLLOUT, 0}};
+        poll(fds, 1, -1);
+        return true;
+    }
+    else {
+        std::cerr << "SSL error: " << err << std::endl;
+        return false;
+    }
 }
 
 /**
@@ -377,6 +441,14 @@ void TLS<RecvMsg, SendMsg>::disableNaglesAlgorithm(const int sock) {
     int result = setsockopt(sock, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
     if (result < 0) {
         std::cerr << "Unable to disable Nagle's algorithm" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+}
+
+template <class RecvMsg, class SendMsg>
+void TLS<RecvMsg, SendMsg>::setNonBlocking(const int sock) {
+    if (fcntl(sock, F_SETFL, O_NONBLOCK) < 0) {
+        std::cerr << "Unable to set socket to non-blocking" << std::endl;
         exit(EXIT_FAILURE);
     }
 }

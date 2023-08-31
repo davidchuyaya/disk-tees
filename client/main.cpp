@@ -24,11 +24,11 @@ static const struct fuse_opt config_spec[] = {
 	FUSE_OPT_END
 };
 
-std::string getRedirectPoint() {
+std::string getPath() {
     if (std::string(config.trustedMode) == "local")
-        return "~/disk-tees/build/client" + std::to_string(config.id) + "/storage";
+        return std::string(getenv("HOME")) + "/disk-tees/build/client" + std::to_string(config.id);
     else
-        return "/home/azureuser/disk-tees/build/client" + std::to_string(config.id) + "/storage";
+        return "/home/azureuser/disk-tees/build/client" + std::to_string(config.id);
 }
 
 matchB matchmake(const int id, const networkConfig& ccfConf, const networkConfig& replicaConf) {
@@ -54,42 +54,57 @@ int main(int argc, char* argv[]) {
         exit(EXIT_FAILURE);
 
     // No replicas
-    if (!config.network) {
-        ClientFuse fuse(config.network, ballot {0, 0, 0}, getRedirectPoint(), 0, {});
-        return fuse.run(args.argc, args.argv);
-    }
-    // Otherwise, begin leader election
+    // if (!config.network) {
+    //     ClientFuse fuse(config.network, ballot {0, 0, 0}, path + "/storage", 0, {});
+    //     return fuse.run(args.argc, args.argv);
+    // }
+    // // Otherwise, begin leader election
 
-    // For some reason, the client's current path changes to root between the reading of network config and TLS, so we pass it to TLS
-    std::string path = std::filesystem::current_path().string();
+    // // For some reason, the client's current path changes to root between the reading of network config and TLS, so we pass it to TLS
+    std::string path = getPath();
 
-    networkConfig ccfConf = NetworkConfig::readNetworkConfig("ccf.json");
-    networkConfig replicaConf = NetworkConfig::readNetworkConfig("replicas.json");
+    // networkConfig ccfConf = NetworkConfig::readNetworkConfig("ccf.json");
+    // networkConfig replicaConf = NetworkConfig::readNetworkConfig("replicas.json");
 
-    // 1. Send MatchA to CCF, wait for MatchB
-    matchB matchmakeResult = matchmake(config.id, ccfConf, replicaConf);
-    // 2. Connect to replicas
-    addresses replicas = NetworkConfig::configToAddrs(Replica, replicaConf);
-    int quorum = replicaConf.size() / 2 + 1;
+    // // 1. Send MatchA to CCF, wait for MatchB
+    // matchB matchmakeResult = matchmake(config.id, ccfConf, replicaConf);
+    // // 2. Connect to replicas
+    // addresses replicas = NetworkConfig::configToAddrs(Replica, replicaConf);
+    // int quorum = replicaConf.size() / 2 + 1;
     std::string name = "client" + std::to_string(config.id);
     
-    ClientFuse fuse(config.network, matchmakeResult.r, getRedirectPoint(), quorum, replicas);
-    TLS<replicaMsg, clientMsg> replicaTLS(config.id, name, Replica, Client, replicaConf, path,
-        [&](const replicaMsg& payload, const std::string& addr, SSL* sender) {
-            std::visit(fuse, payload);
-    });
-    fuse.addTLS(&replicaTLS);
-    // 3. Broadcast p1as
-    replicaTLS.broadcast(p1a { 
-        .r = matchmakeResult.r,
-        .netConf = replicaConf
-    }, replicas);
-    // 4. Process p1bs
-    // TODO: Have replicas respond
+    // ClientFuse fuse(config.network, matchmakeResult.r, path + "/storage", quorum, replicas);
+    // TLS<replicaMsg, clientMsg> replicaTLS(config.id, name, Replica, Client, replicaConf, path,
+    //     [&](const replicaMsg& payload, const std::string& addr, SSL* sender) {
+    //         std::visit(fuse, payload);
+    // });
+    // fuse.addTLS(&replicaTLS);
+    // // 3. Broadcast p1as
+    // replicaTLS.broadcast(p1a { 
+    //     .r = matchmakeResult.r,
+    //     .netConf = replicaConf
+    // }, replicas);
+    // // 4. Process p1bs
+    // // TODO: Have replicas respond
 
-    // TODO: Skip networking if it is turned off, replace network macro
-    // TODO: If there is no prior state, run file setup script
-    // TODO: Run start script
+    // // TODO: Skip networking if it is turned off, replace network macro
+    // // TODO: If there is no prior state, run file setup script
+    // // TODO: Run start script
+
+    TLS<helloMsg, helloMsg> replicaTLS(config.id, name, Replica, Client, {{1, "127.0.0.1"}}, path,
+        [&](const helloMsg& payload, const std::string& addr, SSL* sender) {
+            std::cout << "Received message from replica: " << payload.text << std::endl;
+    });
+
+
+    while (true) {
+        for (std::string line; std::getline(std::cin, line);) {
+            replicaTLS.broadcast(helloMsg {
+                .text = line
+            });
+        }
+        replicaTLS.runEventLoopOnce(-1);
+    }
     
-    return fuse.run(args.argc, args.argv);
+    // return fuse.run(args.argc, args.argv);
 }

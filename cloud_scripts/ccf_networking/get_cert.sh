@@ -51,3 +51,5 @@ CERT=$(echo $CERT64 | base64 -d)
 # Need quotes around $CERT to preserve newlines: https://stackoverflow.com/a/22101842/4028758
 echo "$CERT" > $CERT_NAME
 echo "Successfully downloaded cert for id: $ID, name: $NAME"
+# Necessary for all certs under CApath: https://stackoverflow.com/a/32451318/4028758
+c_rehash .

@@ -49,6 +49,9 @@ sudo mount -t tmpfs -o size=2G tmpfs $ZIPPED_DIR
 DIR=${BUILD_DIR}/shim
 mkdir $DIR
 
+# Start background process to make sure FUSE checks for messages periodically
+$HOME_DIR/disk-tees/cloud_scripts/fuse_waker.sh -n $NAME -t $TRUSTED_MODE &
+
 # Make tee_fuse, mount it on $DIR and redirect to $TMPFS_DIR
 INSTALL_SCRIPT="$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_install.sh -t $TRUSTED_MODE"
 RUN_SCRIPT="$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR"

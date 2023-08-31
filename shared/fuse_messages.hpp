@@ -282,3 +282,7 @@ typedef std::variant<p1b,
                     p2b,
                     fsyncMissing,
                     fsyncAck> replicaMsg;
+
+struct helloMsg {
+    std::string text;
+};
