@@ -2,15 +2,14 @@
 #include <string>
 #include <map>
 #include <set>
-#include <mutex>
 #include "../shared/fuse_messages.hpp"
 #include "../shared/tls.hpp"
 #include "../shared/tls.cpp"
 
 class ReplicaFuse {
 public:
-    ReplicaFuse(const int id, const std::string& name, const std::string& directory, const networkConfig& ccf, const std::string& path);
-    void addClientTLS(TLS<clientMsg, replicaMsg> *tls);
+    ReplicaFuse(const int id, const std::string& name, const std::string& trustedMode, const std::string& directory, const networkConfig& ccf, const std::string& path);
+    void addClientTLS(TLS<clientMsg> *tls);
     // Visitor pattern: https://www.cppstories.com/2018/09/visit-variants/. One for every possible type in clientMsg
     void operator()(const mknodParams& params);
     void operator()(const mkdirParams& params);
@@ -35,25 +34,28 @@ public:
     void operator()(const p1a& msg);
     void operator()(const diskReq& msg);
     void operator()(const p2a& msg);
-    std::mutex allMutex; // Must acquire lock before executing any function, since all writes check the ballot, which can be changed by p1a/p2a, and all writes impact disk, which can be overwritten by p2a
-    bool shouldBroadcast; // Should be set before executing any function. Tells the replica whether or not to broadcast this message to other replicas
+    std::string sender; // Set before each visitor function is called
 
 private:
     const int id;
     const std::string name;
+    const std::string trustedMode;
     const std::string directory;
     const networkConfig ccf;
     const std::string path;
-    addresses replicas;
+    std::string client; // the client with the highest ballot (reset in p1a)
+    addresses replicas; // the replicas in the latest config (reset in p1a)
+    networkConfig replicasNetConf;
     int written = -1;
-    ballot highestBallot;
-    ballot normalBallot;
-    std::map<int, clientMsg> pendingWrites;
-    std::map<int, fsyncParams> pendingFsyncs; // Separate fsync from other writes, since fsync does not increment the write count
-    std::map<int, int> fileHandleConverter;
-    TLS<clientMsg, replicaMsg> *clientTLS;
-    TLS<clientMsg, clientMsg> *replicaTLS;
+    ballot highestBallot = {0,0,0};
+    ballot normalBallot = {0,0,0};
+    std::map<int, clientMsg> pendingWrites = {};
+    std::map<int, fsyncParams> pendingFsyncs = {}; // Separate fsync from other writes, since fsync does not increment the write count
+    std::map <int, std::chrono::steady_clock::time_point> fsyncRecvTime = {}; // TODO: Send fsyncMissing on timeout
+    std::map<int, int> fileHandleConverter = {};
+    TLS<clientMsg> *clientTLS;
 
     bool preWriteCheck(const int seq, const ballot& r, const clientMsg& msg);
     void postWriteCheck(const int seq);
+    std::chrono::steady_clock::time_point now();
 };

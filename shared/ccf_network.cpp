@@ -14,7 +14,7 @@ const std::string GET_CERT_OUTPUT_FILE = "get_cert.json";
 const std::string MATCH_OUTPUT_FILE = "match.json";
 const std::string GARBAGE_OUTPUT_FILE = "garbage.json";
 
-CCFNetwork::CCFNetwork(const networkConfig ccf) {
+CCFNetwork::CCFNetwork(const std::string& path, const networkConfig ccf) : path(path) {
     auto valuesRange = std::views::values(ccf);
     ccfAddresses = std::vector<std::string>(valuesRange.begin(), valuesRange.end());
     liveAddresses = ccfAddresses;
@@ -27,7 +27,7 @@ void CCFNetwork::getCert(const int id, const std::string& name, const std::strin
         // construct bash command
         const std::string& address = liveAddresses.back();
         std::ostringstream ss;
-        ss << "cloud_scripts/ccf_networking/get_cert_no_retry.sh";
+        ss << path << "../../cloud_scripts/ccf_networking/get_cert_no_retry.sh";
         ss << " -a " << address;
         ss << " -i " << id;
         ss << " -n " << name;
@@ -54,7 +54,7 @@ matchB CCFNetwork::sendMatchA(const ballot r, const networkConfig config) {
         // construct bash command
         const std::string& address = liveAddresses.back();
         std::ostringstream ss;
-        ss << "cloud_scripts/ccf_networking/send_json.sh";
+        ss << path << "../../cloud_scripts/ccf_networking/send_json.sh";
         ss << " -a " << address;
         ss << " -e match";
         ss << " -s "<< sendData.dump();
@@ -101,7 +101,7 @@ void CCFNetwork::sendGarbageA(const ballot r) {
         // construct bash command
         const std::string& address = liveAddresses.back();
         std::ostringstream ss;
-        ss << "cloud_scripts/ccf_networking/send_json.sh";
+        ss << path << "../../cloud_scripts/ccf_networking/send_json.sh";
         ss << " -a " << address;
         ss << " -e garbage";
         ss << " -s "<< sendData.dump();

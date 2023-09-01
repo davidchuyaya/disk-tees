@@ -1,3 +1,4 @@
+#include <chrono>
 #include "client_fuse.hpp"
 #include "../shared/network_config.hpp"
 #include "../shared/tls.hpp"
@@ -5,11 +6,12 @@
 #include "../shared/fuse_messages.hpp"
 #include "../shared/ccf_network.hpp"
 
+#define DISK_REQ_TIMEOUT 60 * 1000 // 60 seconds
+
 static struct config {
     int id;
     bool network;
     const char* trustedMode;
-    const char* installScript;
     const char* runScript;
 } config;
 
@@ -19,7 +21,6 @@ static const struct fuse_opt config_spec[] = {
 	OPTION("-i %d", id),
     OPTION("-t %s", trustedMode),
     OPTION("-n", network),
-    OPTION("--install=%s", installScript),
     OPTION("--run=%s", runScript),
 	FUSE_OPT_END
 };
@@ -31,13 +32,12 @@ std::string getPath() {
         return "/home/azureuser/disk-tees/build/client" + std::to_string(config.id);
 }
 
-matchB matchmake(const int id, const networkConfig& ccfConf, const networkConfig& replicaConf) {
+matchB matchmake(CCFNetwork& ccfNetwork, const int id, const networkConfig& replicaConf) {
     ballot r {
         .ballotNum = 0,
         .clientId = id,
         .configNum = 0
     };
-    CCFNetwork ccfNetwork(ccfConf);
     while (true) {
         matchB reply = ccfNetwork.sendMatchA(r, replicaConf);
         if (reply.r == r) {
@@ -53,58 +53,152 @@ int main(int argc, char* argv[]) {
     if (fuse_opt_parse(&args, &config, config_spec, NULL) == 1)
         exit(EXIT_FAILURE);
 
-    // No replicas
-    // if (!config.network) {
-    //     ClientFuse fuse(config.network, ballot {0, 0, 0}, path + "/storage", 0, {});
-    //     return fuse.run(args.argc, args.argv);
-    // }
-    // // Otherwise, begin leader election
-
-    // // For some reason, the client's current path changes to root between the reading of network config and TLS, so we pass it to TLS
     std::string path = getPath();
 
-    // networkConfig ccfConf = NetworkConfig::readNetworkConfig("ccf.json");
-    // networkConfig replicaConf = NetworkConfig::readNetworkConfig("replicas.json");
+    // No replicas
+    if (!config.network) {
+        ClientFuse fuse(config.network, ballot {0, 0, 0}, path + "/storage", 0, {});
+        return fuse.run(args.argc, args.argv);
+    }
+    // Otherwise, begin leader election
 
-    // // 1. Send MatchA to CCF, wait for MatchB
-    // matchB matchmakeResult = matchmake(config.id, ccfConf, replicaConf);
-    // // 2. Connect to replicas
-    // addresses replicas = NetworkConfig::configToAddrs(Replica, replicaConf);
-    // int quorum = replicaConf.size() / 2 + 1;
+    networkConfig ccfConf = NetworkConfig::readNetworkConfig("ccf.json");
+    networkConfig replicaConf = NetworkConfig::readNetworkConfig("replicas.json");
+
+    // 1. Send MatchA to CCF, wait for MatchB
+    CCFNetwork ccfNetwork(path, ccfConf);
+    matchB matchmakeResult = matchmake(ccfNetwork, config.id, ccfConf);
+    ballot r = matchmakeResult.r;
+
+    // 2. Find the replica addresses for the current config
+    addresses replicas = NetworkConfig::configToAddrs(Replica, replicaConf);
+    int quorum = replicaConf.size() / 2 + 1;
     std::string name = "client" + std::to_string(config.id);
+
+    // 3. Find all replicas in past or present configs, removing duplicates
+    matchmakeResult.configs.emplace_back(replicaConf);
+    std::map<int, std::string> allReplicasConf;
+    for (const auto& netConf : matchmakeResult.configs)
+        allReplicasConf.insert(netConf.begin(), netConf.end());
+    addresses allReplicas = NetworkConfig::configToAddrs(Replica, allReplicasConf);
     
-    // ClientFuse fuse(config.network, matchmakeResult.r, path + "/storage", quorum, replicas);
-    // TLS<replicaMsg, clientMsg> replicaTLS(config.id, name, Replica, Client, replicaConf, path,
-    //     [&](const replicaMsg& payload, const std::string& addr, SSL* sender) {
-    //         std::visit(fuse, payload);
-    // });
-    // fuse.addTLS(&replicaTLS);
-    // // 3. Broadcast p1as
-    // replicaTLS.broadcast(p1a { 
-    //     .r = matchmakeResult.r,
-    //     .netConf = replicaConf
-    // }, replicas);
-    // // 4. Process p1bs
-    // // TODO: Have replicas respond
-
-    // // TODO: Skip networking if it is turned off, replace network macro
-    // // TODO: If there is no prior state, run file setup script
-    // // TODO: Run start script
-
-    TLS<helloMsg, helloMsg> replicaTLS(config.id, name, Replica, Client, {{1, "127.0.0.1"}}, path,
-        [&](const helloMsg& payload, const std::string& addr, SSL* sender) {
-            std::cout << "Received message from replica: " << payload.text << std::endl;
+    // 4. Connect to all replicas
+    ClientFuse fuse(config.network, r, path + "/storage", quorum, replicas);
+    TLS<replicaMsg> replicaTLS(config.id, name, Client, allReplicasConf, path,
+        [&](const replicaMsg& payload, const std::string& addr) {
+            std::visit(fuse, payload);
     });
+    fuse.addTLS(&replicaTLS);
 
+    // 5. Broadcast p1as
+    replicaTLS.broadcast<clientMsg>(p1a { 
+        .r = r,
+        .netConf = replicaConf
+    }, allReplicas);
 
-    while (true) {
-        for (std::string line; std::getline(std::cin, line);) {
-            replicaTLS.broadcast(helloMsg {
-                .text = line
-            });
-        }
+    // 6. Process p1bs
+    while (!fuse.p1bQuorum(matchmakeResult.configs)) {
         replicaTLS.runEventLoopOnce(-1);
     }
+
+    // 7. Send disk request to highest ranking replica, if it has disk. Retry on timeout
+    bool noPriorState = false;
+    disk diskMsg;
+    while (true) {
+        p1b highestRanking = fuse.highestRankingP1b();
+        if (highestRanking.written < 0) {
+            noPriorState = true;
+            break;
+        }
+
+        replicaTLS.send<clientMsg>(diskReq{.id = config.id, .r = r},
+                                   allReplicasConf[highestRanking.id]);
+
+        // Wait for disk response until timeout
+        auto begin = std::chrono::steady_clock::now();
+        while (fuse.diskChecksums.empty()) {
+            replicaTLS.runEventLoopOnce(DISK_REQ_TIMEOUT);
+            auto end = std::chrono::steady_clock::now();
+
+            // timed out
+            if (std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() >= DISK_REQ_TIMEOUT)
+                break;
+        }
+
+        // Attempt to read any disk that is available
+        while (true) {
+            bool copiedDisk = false;
+            for (const auto& disk : fuse.diskChecksums) {
+                std::ostringstream ss;
+                ss << path << "../../cloud_scripts/unzip_disk.sh";
+                ss << " -s replica" << disk.id;
+                ss << " -d " << name;
+                ss << " -t " << config.trustedMode;
+                ss << " -c " << disk.diskChecksum;
+                std::cout << "Executing command: " << ss.str() << std::endl;
+                int errorCode = system(ss.str().c_str());
+
+                if (errorCode == 0) {
+                    copiedDisk = true;
+                    fuse.written = disk.written;
+                    diskMsg = disk;
+                    break;
+                }
+            }
+            if (copiedDisk)
+                break;
+
+            // If no disk exists, see if there's another replica we can try
+            fuse.successfulP1bs.erase(highestRanking);
+            if (fuse.p1bQuorum(matchmakeResult.configs))
+                break;
+            else { // No other replica to try, keep waiting
+                fuse.successfulP1bs.emplace(highestRanking);
+                replicaTLS.runEventLoopOnce(-1);
+            }
+        }
+    }
+
+    // 8. Rebroadcast disk (p2a)
+    if (!noPriorState) {
+        std::string replicaName = "replica" + std::to_string(diskMsg.id);
+        for (auto& [id, ip] : replicaConf) {
+            if (id != diskMsg.id) {
+                // Send the disk
+                std::ostringstream ss;
+                ss << path << "../../cloud_scripts/send_disk.sh";
+                ss << " -s " << replicaName;
+                ss << " -d replica" << id;
+                ss << " -a " << ip << ":" << NetworkConfig::getPort(Replica, id);
+                ss << " -t " << config.trustedMode; // Note: Excludes -z because we're just sending the already-zipped disk, don't need to rezip
+                std::cout << "Executing command: " << ss.str() << std::endl;
+                int errorCode = system(ss.str().c_str());
+            }
+        }
+        // Delete zipped disk
+        std::remove((path + "/zipped-storage/" + replicaName + ".tar.gz").c_str());
+    }
+    fuse.successfulP1bs.clear();
+    fuse.diskChecksums.clear();
+
+    replicaTLS.broadcast<clientMsg>(p2a {
+        .r = r,
+        .written = fuse.written,
+        .diskReplicaName = noPriorState ? "" : "replica" + std::to_string(diskMsg.id),
+        .diskChecksum = noPriorState ? "" : diskMsg.diskChecksum
+    }, replicas);
+    while (fuse.successfulP2bs.size() < quorum) {
+        replicaTLS.runEventLoopOnce(-1);
+    }
+
+    // 9. Kill old replicas, if there are any
+    if (allReplicasConf.size() > replicaConf.size()) {
+        ccfNetwork.sendGarbageA(r);
+        // Note: We can't actually kill replicas from here. Rely on trusted admin once they see the replica's no longer in the config.
+    }
+
+    // TODO: run in background
+    system(config.runScript);
     
-    // return fuse.run(args.argc, args.argv);
+    return fuse.run(args.argc, args.argv);
 }

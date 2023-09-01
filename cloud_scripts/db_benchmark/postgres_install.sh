@@ -28,8 +28,12 @@ $BUILD_DIR=$HOME_DIR/disk-tees/build
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 # Postgres 15.4 is the latest non-beta at the time of writing: https://www.postgresql.org/ftp/source/
+if [ -d postgresql-15.4 ]; then
+  exit 0 # This script has run before
+fi
 wget https://ftp.postgresql.org/pub/source/v15.4/postgresql-15.4.tar.gz
 tar -xf postgresql-15.4.tar.gz
+rm postgresql-15.4.tar.gz
 cd postgresql-15.4/
 ./configure
 make

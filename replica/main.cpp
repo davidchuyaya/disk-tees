@@ -51,33 +51,21 @@ int main(int argc, char* argv[]) {
     config conf = parseArgs(argc, argv);
     
     std::string path = getPath(conf);
-    // networkConfig ccfConf = NetworkConfig::readNetworkConfig("ccf.json");
+    networkConfig ccfConf = NetworkConfig::readNetworkConfig("ccf.json");
     std::string name = "replica" + std::to_string(conf.id);
 
-    // ReplicaFuse replicaFuse(conf.id, name, getDir(conf), ccfConf, path);
-    // TLS<clientMsg, replicaMsg> clientTLS(conf.id, name, Client, Replica, {}, path,
-    //     [&](const clientMsg& payload, const std::string& addr, SSL* sender) {
-    //     std::unique_lock<std::mutex> lock(replicaFuse.allMutex);
-    //     replicaFuse.shouldBroadcast = true; // Broadcast messages we directly received from the client
-    //     // Essentially a switch statement matching the possible types of messages
-    //     std::visit(replicaFuse, payload);
-    // });
-    // replicaFuse.addClientTLS(&clientTLS);
-// 
-    // while (true) {}
-
-    TLS<helloMsg, helloMsg> clientTLS(conf.id, name, Client, Replica, {}, path,
-        [&](const helloMsg& payload, const std::string& addr, SSL* sender) {
-            std::cout << "Received message from client: " << payload.text << std::endl;
+    ReplicaFuse replicaFuse(conf.id, name, conf.trustedMode, path + "/storage", ccfConf, path);
+    TLS<clientMsg> clientTLS(conf.id, name, Replica, {}, path,
+        [&](const clientMsg& payload, const std::string& addr) {
+        replicaFuse.sender = addr;
+        // Essentially a switch statement matching the possible types of messages
+        std::visit(replicaFuse, payload);
     });
+    replicaFuse.addClientTLS(&clientTLS);
 
     while (true) {
+        // Listen forever
         clientTLS.runEventLoopOnce(-1);
-        // for (std::string line; std::getline(std::cin, line);) {
-        //     clientTLS.broadcast(helloMsg {
-        //         .text = line
-        //     });
-        // }
     }
 
     return 0;

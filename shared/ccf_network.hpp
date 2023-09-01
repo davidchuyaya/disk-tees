@@ -12,11 +12,12 @@ struct matchB {
 class CCFNetwork {
 public:
     // Note: Addresses should be formatted as "ip:port"
-    CCFNetwork(const networkConfig ccf);
+    CCFNetwork(const std::string& path, const networkConfig ccf);
     void getCert(const int id, const std::string& name, const std::string& type);
     matchB sendMatchA(const ballot r, const networkConfig config);
     void sendGarbageA(const ballot r);
 private:
+    const std::string path;
     std::vector<std::string> ccfAddresses;
     std::vector<std::string> liveAddresses;
 

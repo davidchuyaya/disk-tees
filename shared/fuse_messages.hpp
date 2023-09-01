@@ -210,13 +210,15 @@ struct p1a {
 };
 
 struct diskReq {
+    int id;
     ballot r;
 };
 
 struct p2a {
     ballot r;
     int written;
-    std::string diskDigest;
+    std::string diskReplicaName;
+    std::string diskChecksum;
 };
 
 // Add to variant as the number of variants increase
@@ -250,18 +252,27 @@ struct p1b {
     int written;
     ballot normalBallot;
     ballot highestBallot;
+
+    bool operator <(const p1b& rhs) const { 
+        return id < rhs.id;
+    }
 };
 
 struct disk {
+    int id;
     ballot clientBallot;
-    std::string diskDigest;
+    int written;
+    std::string diskChecksum;
+
+    bool operator <(const disk& rhs) const { return id < rhs.id; }
 };
 
 struct p2b {
     int id;
     ballot clientBallot;
-    int written;
     ballot highestBallot;
+
+    bool operator<(const p2b& rhs) const { return id < rhs.id; }
 };
 
 struct fsyncMissing {

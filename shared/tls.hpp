@@ -2,49 +2,49 @@
 #include <sys/poll.h>
 #include <openssl/ssl.h>
 #include <arpa/inet.h>
-#include <shared_mutex>
 #include <map>
 #include <vector>
 #include <functional>
 #include <string>
 #include <span>
+#include <system_error>
 #include "network_config.hpp"
 
-template <class RecvMsg, class SendMsg>
+template <class RecvMsg>
 class TLS {
     static const int READ_BUFFER_SIZE = 8192;
 
     public:
         typedef std::function<void(RecvMsg, std::string, SSL*)> msgRecvFunc;
-        TLS(const int id, const std::string name, const NodeType remoteType, const NodeType ownType,
-             const networkConfig netConf, const std::string path, const std::function<void(const RecvMsg&, const std::string&, SSL*)> onRecv);
+        TLS(const int id, const std::string name, const NodeType ownType,
+             const networkConfig netConf, const std::string path, const std::function<void(const RecvMsg&, const std::string&)> onRecv);
         void runEventLoopOnce(const int timeout); // 0 = return immediately, -1 = block until event. In milliseconds
-        // WARN: Only use this broadcast if the set of destinations is not available through some config (such as the set of clients)
-        void broadcast(const SendMsg& payload);
+        template <class SendMsg>
         void broadcast(const SendMsg& payload, const addresses& dests);
+        template <class SendMsg>
         void sendRoundRobin(const SendMsg& payload, const addresses& dests);
+        template <class SendMsg>
         void send(const SendMsg& payload, const std::string& addr);
         void newNetwork(const networkConfig& netConf);
 
     private:
         const int id;
         const std::string name;
-        const NodeType remoteType;
         const NodeType ownType;
         const std::string path;
-        const std::function<void(const RecvMsg&, const std::string&, SSL*)> onRecv;
-
-        std::vector<pollfd> openSockets;
-        int serverSocket;
+        const std::function<void(const RecvMsg&, const std::string&)> onRecv;
 
         char readBuffer[READ_BUFFER_SIZE];
         
-        std::map<std::string, SSL*> sslFromAddr;
-        std::map<int, SSL*> sslFromSocket;
-        std::map<int, std::string> addrFromSocket;
-        std::map<std::string, int> socketFromAddr;
-        SSL_CTX* serverCtx;
+        std::vector<pollfd> openSockets = {};
+        int serverSocket;
+        std::map<std::string, SSL*> sslFromAddr = {};
+        std::map<int, SSL*> sslFromSocket = {};
+        std::map<int, std::string> addrFromSocket = {};
+        std::map<std::string, int> socketFromAddr = {};
         int roundRobinIndex = 0;
+
+        SSL_CTX* serverCtx;
 
         void startServer();
         int acceptConnection(); // returns socket of new connection, -1 if non exists

@@ -21,39 +21,7 @@ make
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 ```
 
-## Running locally
-
-If you want to test locally, you'd need to create the necessary keys and certificates. Execute:
-```bash
-./create_testing_cert.sh
-```
-
-TODO: Figure of how writes enter through the mountpoint, are sent to the replicas, and then are written to the redirect point and the replica's directory.
-
-To start the replicas, execute the following;
-```bash
-replica/disk_tees -i <id> -d <directory>
-```
-Note that `<id>` must match some ID specified in `network.json`, which can be edited based on the ports you'd like to expose. Documentation for `network.json` can be found in `shared/network_config.hpp`.
-`<directory>` is the directory where the replica will store its data. Note that this directory must first be manually created.
-
-To start the client, execute the following:
-```bash
-client/tee_fuse -f -s -i <id> -r <redirect point> <mountpoint>
-```
-- `-f` states that the client should run in the foreground, so we can see any error logs.
-- `-s` turns on single-threaded mode, which is required for sequentially sequencing writes.
-- `-i` is the id, as before.
-- `-r` is where the client will store the data.
-- `<mountpoint>` is the directory where the filesystem will be mounted.
-To see all the options provided by FUSE, execute `client/tee_fuse -h`.
-
-When you're done running the system, or if the system terminates unexpectedly, you may need to unmount by executing the following:
-```bash
-sudo umount <mountpoint>
-```
-
-## Running in Azure
+## Running
 
 Execute the following:
 ```bash
@@ -61,37 +29,45 @@ Execute the following:
 ```
 Documentation for each mode can be found by executing `./launch.sh`. Note that the script will not work if you are not under the "Azure Research Subs" subscription in Azure. Be sure to modify the script to use your own subscription.
 
-TODO: Launch CCF, load replica IP addresses in, then launch client with that config. Might want to break up launch.sh into multiple scripts so it's easier to debug.
+To run locally, use `local` as the trusted mode. Files will be created under the `build` directory.
 
-### Shutting down Azure
+### Cleaning up locally
+
+### Cleaning up Azure
 TODO
 
 
-TODO: The following Azure sections are deprecated but still useful for me, will delete after I'm done writing scripts
-## Creating certificates in Azure
-### Untrusted
-Execute the following on your local computer:
+
+## Developing locally
+
+This section is for testing modifications to the code without using `./launch.sh`, which is the recommended (but heavier) approach.
+
+TODO: Figure of how writes enter through the mountpoint, are sent to the replicas, and then are written to the redirect point and the replica's directory.
+
+The system produces 2 executables: `replica/disk_tees` and `client/tee_fuse`. You can get a rough idea of how to run each one by reading `cloud_scripts/cloud_init/replica_init.sh` and `cloud_scripts/cloud_init/client_init_rollbaccine.sh`. Some of the client's parameters are from libfuse, so I'll document them below, although I've added more parameters.
+
 ```bash
-cloud_scripts/launch_untrusted.sh
-cloud_scripts/distribute_cert.sh
+client/tee_fuse -f -s <mountpoint>
 ```
+- `-f` states that the client should run in the foreground, so we can see any error logs.
+- `-s` turns on single-threaded mode, which is required for sequentially sequencing writes.
+- `<mountpoint>` is the directory where the filesystem will be mounted.
+To see all the options provided by FUSE, execute `client/tee_fuse -h`.
 
-Note that the script will not work if you are not under the "Azure Research Subs" subscription in Azure. Be sure to modify the script to use your own subscription. More details and configuration parameters can be found at the top of the script.
-The VMs in the cloud will run `cloud-init.sh` as part of their startup process and create `server_cert.pem` and `server_key.pem` files under `/home/azureuser/`. The certificates will then be shared between all servers and clients. The key should not leave the server.
+The system uses CCF to store configurations. The main logic is in `ccf/src/matchmaker.js`.
 
-## Shutting down Azure
-### Untrusted
-Execute the following on your local computer:
+When you're done running the system, or if the system terminates unexpectedly, you may need to unmount by executing the following:
 ```bash
-cloud_scripts/cleanup_untrusted.sh
+sudo umount <mountpoint>
 ```
 
 
 ## Libraries
-This project makes use of the following C++ libraries:
+This project makes use of (and implicitly trusts) the following libraries:
 
 - [OpenSSL](https://wiki.openssl.org/index.php/Main_Page) - Used for TLS encrypted connections
 - [JSON for modern C++](https://github.com/nlohmann/json#examples) - Used for reading JSON config files
 - [zpp::bits](https://github.com/eyalz800/zpp_bits) - Used for fast serializing/deserializing of CPP structs. Requires C++20
 - [libfuse](https://github.com/libfuse/libfuse) - For intercepting writes to the file system
-- [Fusepp](https://github.com/jachappell/Fusepp) - For wrapping FUSE functions in C++
+- [Fusepp](https://github.com/jachappell/Fusepp) - For wrapping FUSE functions in C++. Copied into `client/Fuse.hpp` and `client/Fuse.cpp`.
+- [CCF](https://github.com/microsoft/CCF/) - For storing configurations

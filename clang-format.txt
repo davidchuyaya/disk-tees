@@ -1,0 +1,6 @@
+﻿---
+BasedOnStyle: Google
+ColumnLimit: '120'
+IndentWidth: '4'
+SpaceBeforeCpp11BracedList: 'true'
+...

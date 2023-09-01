@@ -52,11 +52,11 @@ mkdir $DIR
 # Start background process to make sure FUSE checks for messages periodically
 $HOME_DIR/disk-tees/cloud_scripts/fuse_waker.sh -n $NAME -t $TRUSTED_MODE &
 
+$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_install.sh -t $TRUSTED_MODE
 # Make tee_fuse, mount it on $DIR and redirect to $TMPFS_DIR
-INSTALL_SCRIPT="$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_install.sh -t $TRUSTED_MODE"
 RUN_SCRIPT="$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR"
 cd $HOME_DIR/disk-tees
 cmake .
 make
 cd $BUILD_DIR
-$HOME_DIR/disk-tees/client/tee_fuse -i $ID -t $TRUSTED_MODE -n --install=$INSTALL_SCRIPT --run=$RUN_SCRIPT -f -s $DIR
+$HOME_DIR/disk-tees/client/tee_fuse -i $ID -t $TRUSTED_MODE -n --run=$RUN_SCRIPT -f -s $DIR

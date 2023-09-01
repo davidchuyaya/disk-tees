@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/file.h>
 #include <sys/xattr.h>
+#include <fstream>
 #include <iostream>
 #include <variant>
 #include <cerrno>
@@ -20,11 +21,11 @@
 #define REPLICA_PREPEND_PATH(path) (path)
 #endif
 
-ReplicaFuse::ReplicaFuse(const int id, const std::string& name, const std::string& directory, const networkConfig& ccf, const std::string& path) :
-    id(id), name(name), directory(directory), ccf(ccf), path(path) {
+ReplicaFuse::ReplicaFuse(const int id, const std::string& name, const std::string& trustedMode, const std::string& directory, const networkConfig& ccf, const std::string& path) :
+    id(id), name(name), trustedMode(trustedMode), directory(directory), ccf(ccf), path(path) {
 }
 
-void ReplicaFuse::addClientTLS(TLS<clientMsg, replicaMsg>* tls) {
+void ReplicaFuse::addClientTLS(TLS<clientMsg>* tls) {
     this->clientTLS = tls;
 }
 
@@ -272,12 +273,11 @@ void ReplicaFuse::operator()(const fsyncParams& params) {
         return;
     }
     // Reply to client to confirm commit
-    fsyncAck msg {
+    clientTLS->send<replicaMsg>(fsyncAck {
         .id = id,
         .written = written,
         .r = params.r
-    };
-    clientTLS->broadcast(msg);
+    }, client);
     pendingFsyncs.erase(params.seq);
 
     // Don't use postWriteCheck, since written was not incremented
@@ -336,49 +336,127 @@ void ReplicaFuse::operator()(const copyFileRangeParams &params) {
 }
 
 void ReplicaFuse::operator()(const p1a& msg) {
-    if (msg.r < highestBallot)
-        return;
-    
-    highestBallot = msg.r;
-    // Reply to client
-    clientTLS->broadcast(p1b {
+    // Set the highest ballot if the client's is higher
+    if (highestBallot < msg.r)
+        highestBallot = msg.r;
+
+    // Reply to the sender
+    clientTLS->send<replicaMsg>(p1b {
         .id = id,
         .clientBallot = msg.r,
         .written = written,
         .normalBallot = normalBallot,
         .highestBallot = highestBallot
-    });
+    }, sender);
+
+    if (msg.r < highestBallot)
+        return;
 
     // Connect to replicas in the new config
     // 1. Remove self from list of replicas in config (so we don't send to ourselves)
     networkConfig netConfWithoutSelf = msg.netConf;
     netConfWithoutSelf.erase(id);
+    replicas = NetworkConfig::configToAddrs(Replica, netConfWithoutSelf);
 
-    // 2. Ask CCF for replicas' certificates. Note if we already have the certificate, getCert won't ask CCF.
-    CCFNetwork ccfNetwork(ccf);
+    // 2. Find the set of new replicas to connect to
+    networkConfig newConnections = {};
     for (auto& [peerId, addr] : netConfWithoutSelf) {
+        if (!replicasNetConf.contains(peerId)) {
+            newConnections[peerId] = addr;
+        }
+    }
+
+    // 3. Ask CCF for the new replicas' certificates
+    CCFNetwork ccfNetwork(path, ccf);
+    for (auto& [peerId, addr] : newConnections) {
         ccfNetwork.getCert(peerId, "replica" + std::to_string(peerId), "replica");
     }
 
-    // 3. Connect to replicas
-    if (replicaTLS == nullptr) {
-        replicaTLS = new TLS<clientMsg, clientMsg>(id, name, Replica, Replica, netConfWithoutSelf, path,
-            [&](const clientMsg& payload, const std::string& addr, SSL* sender) {
-                std::unique_lock<std::mutex> lock(allMutex);
-                shouldBroadcast = false; // Don't broadcast messages if we got it from another replica (it was broadcast by them)
-                std::visit(*this, payload);
-        });
-    }
-    replicas = NetworkConfig::configToAddrs(Replica, netConfWithoutSelf);
-    replicaTLS->newNetwork(netConfWithoutSelf);
+    // 4. Connect to the new replicas
+    clientTLS->newNetwork(newConnections);
+
+    // 5. Don't send messages to the old client anymore
+    client = sender;
 }
 
 void ReplicaFuse::operator()(const diskReq& msg) {
-    // TODO: Implement
+    if (msg.r < highestBallot)
+        return;
+    
+    // Send the disk
+    std::ostringstream ss;
+    ss << path << "../../cloud_scripts/send_disk.sh";
+    ss << " -s " << name;
+    ss << " -d client" << msg.id;
+    ss << " -a " << sender << ":" << NetworkConfig::getPort(Client, msg.id);
+    ss << " -t " << trustedMode;
+    ss << " -z";
+    std::cout << "Executing command: " << ss.str() << std::endl;
+    int errorCode = system(ss.str().c_str());
+    // Delete zipped disk
+    std::remove((path + "/zipped-storage/" + name + ".tar.gz").c_str());
+
+    // Read the checksum
+    std::string checksumFilePath = path + "/zipped-storage/" + name + ".tar.gz.md5";
+    std::ifstream file;
+    std::string checksum;
+    file.exceptions(std::ifstream::badbit);
+    try {
+        file.open(checksumFilePath);
+        std::getline(file, checksum);
+    } catch (std::ifstream::failure e) {
+        std::cout << "Error opening checksum: " << checksumFilePath << ", did send_disk.sh fail?" << std::endl;
+        return;
+    }
+
+    // Send checksum to client
+    clientTLS->send<replicaMsg>(disk {
+        .id = id,
+        .clientBallot = msg.r,
+        .diskChecksum = checksum
+    }, sender);
 }
 
 void ReplicaFuse::operator()(const p2a& msg) {
-    // TODO: Implement
+    if (msg.r < highestBallot)
+        return;
+
+    // Try to close all open files, ignore errors
+    for (auto& [fh, localFh] : fileHandleConverter)
+        close(localFh);
+
+    // Unzip the disk if necessary
+    if (!msg.diskChecksum.empty()) {
+        std::ostringstream ss;
+        ss << path << "../../cloud_scripts/unzip_disk.sh";
+        ss << " -s " << msg.diskReplicaName;
+        ss << " -d " << name;
+        ss << " -t " << trustedMode;
+        ss << " -c " << msg.diskChecksum;
+        std::cout << "Executing command: " << ss.str() << std::endl;
+        int errorCode = system(ss.str().c_str());
+
+        if (errorCode != 0) {
+            std::cout << "Unzip disk failed" << std::endl;
+            return;
+        }
+        // Delete zipped disk
+        std::remove((path + "/zipped-storage/" + msg.diskReplicaName + ".tar.gz").c_str());
+    }
+
+    // Reset state
+    normalBallot = msg.r;
+    written = msg.written;
+    pendingWrites = {};
+    pendingFsyncs = {};
+    fileHandleConverter = {};
+
+    // Reply to client
+    clientTLS->send<replicaMsg>(p2b {
+        .id = id,
+        .clientBallot = msg.r,
+        .highestBallot = highestBallot
+    }, sender);
 }
 
 /**
@@ -401,12 +479,13 @@ bool ReplicaFuse::preWriteCheck(const int seq, const ballot& r, const clientMsg&
         return false;
     }
     // Broadcast to other replicas
-    if (shouldBroadcast && replicaTLS != nullptr) {
-        replicaTLS->broadcast(msg, replicas);
+    if (sender != client) {
+        clientTLS->broadcast<clientMsg>(msg, replicas);
     }
     return true;
 }
 
+// TODO: Change into while loop to avoid recursion
 void ReplicaFuse::postWriteCheck(const int seq) {
     pendingWrites.erase(seq);
 
@@ -421,4 +500,8 @@ void ReplicaFuse::postWriteCheck(const int seq) {
     const auto& w = pendingWrites.find(seq);
     if (w != pendingWrites.end())
         std::visit(*this, w->second);
+}
+
+std::chrono::steady_clock::time_point ReplicaFuse::now() {
+    return std::chrono::steady_clock::now();
 }
