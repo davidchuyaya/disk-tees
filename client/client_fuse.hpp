@@ -68,6 +68,7 @@ public:
     static int client_removexattr(const char *path, const char *name);
     static int client_copy_file_range(const char *path_in, fuse_file_info *fi_in, off_t off_in, const char *path_out, fuse_file_info *fi_out, off_t off_out, size_t len, int flags);
 
+    inline static std::string sender; // Set before each visitor function is called
     inline static int written = -1;
     inline static int replicasCommitted = 0;  // The largest sequence number for which replicas committed
     // State that indicates where in the protocol we are
@@ -86,7 +87,7 @@ private:
     inline static std::string redirectPoint; // Directory to redirect writes to. Since we're passing through all disk operations, this is necessary to prevent retriggering FUSE in the same directory
     inline static ballot r;
     // 2. Mutable state
-    inline static std::vector<clientMsg> uncommittedWrites = {};
+    inline static std::map<int, clientMsg> uncommittedWrites = {}; // Key = sequence number
     inline static std::map<int, int> replicaWritten = {}; // Map from ID to largest sequence number for each replica
     inline static addresses replicas;
     // 3. State only relevant during specific phases of the protocol

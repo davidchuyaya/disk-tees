@@ -20,17 +20,19 @@ else
     HOME_DIR=/home/azureuser
 fi
 
-
-sudo apt update
-sudo apt -y install build-essential libreadline-dev zlib1g-dev
-
-$BUILD_DIR=$HOME_DIR/disk-tees/build
+BUILD_DIR=$HOME_DIR/disk-tees/build
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 # Postgres 15.4 is the latest non-beta at the time of writing: https://www.postgresql.org/ftp/source/
 if [ -d postgresql-15.4 ]; then
-  exit 0 # This script has run before
+  echo "Postgres already installed"
+  exit 0 
 fi
+
+echo "Will need sudo access to install postgres and its dependencies"
+sudo apt update
+sudo apt -y install build-essential libreadline-dev zlib1g-dev
+
 wget https://ftp.postgresql.org/pub/source/v15.4/postgresql-15.4.tar.gz
 tar -xf postgresql-15.4.tar.gz
 rm postgresql-15.4.tar.gz

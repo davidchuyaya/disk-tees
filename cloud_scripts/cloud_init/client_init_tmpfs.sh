@@ -5,6 +5,7 @@
 # Assumes the following variables will be inserted via attach_var.sh:
 #   TRUSTED_MODE: "local", "trusted", or "untrusted"
 #   ID: client ID
+#   TMPFS_MEMORY: how much memory to allocate to tmpfs (in Gb)
 
 if [ $TRUSTED_MODE == "local" ]; then
     HOME_DIR=~
@@ -20,7 +21,6 @@ mkdir -p $BUILD_DIR
 
 $HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_install.sh -t $TRUSTED_MODE
 DIR=$BUILD_DIR/shim
-mkdir $DIR
-#TODO: Figure out how large to make tmpfs (how many Gb)
-sudo mount -t tmpfs -o size=2G tmpfs $DIR
+mkdir -p $DIR
+sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $DIR
 $HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR

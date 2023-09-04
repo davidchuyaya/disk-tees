@@ -21,5 +21,10 @@ while getopts 'i:o:n:v:' flag; do
 done
 
 # Insert the line
-sed "2i ${NAME}=${VALUE}" $INPUT > $OUTPUT
-chmod +x $OUTPUT
+if [ $INPUT = $OUTPUT ]
+then
+  sed -i "2i ${NAME}=${VALUE}" $INPUT
+else
+  sed "2i ${NAME}=${VALUE}" $INPUT > $OUTPUT
+  chmod +x $OUTPUT
+fi

@@ -1,12 +1,14 @@
 #!/bin/bash
 print_usage() {
-  printf "Usage: ./$0 -t <trusted mode> -p <postgres mode>\n"
+  printf "Usage: ./$0 -t <trusted mode> -p <postgres mode> [-w <wait secs before running> -m <tmpfs memory size (GB)>]\n"
   printf "Options:\n"
   printf "  -t <trusted mode>    Options: trusted, untrusted, local\n"
   printf "  -p <postgres mode>   Options: normal (postgres on a single machine)\n"
   printf "                             tmpfs (postgres on a single machine, writing to tmpfs)\n"
   printf "                             fuse (postgres on a single machine, writing to tmpfs, redirected through fuse)\n"
   printf "                             rollbaccine (postgres + 2f+1 disk TEEs)\n"
+  printf "  -w <wait secs>       Expected seconds between starting the client and it winning leader election. Only relevant in rollbaccine mode\n"
+  printf "  -m <tmpfs memory size (GB)>   How much memory to provide tmpfs\n"
 }
 
 if (( $# == 0 )); then
@@ -14,10 +16,14 @@ if (( $# == 0 )); then
     exit 1
 fi
 
-while getopts 't:p:' flag; do
+WAIT_SECS=0
+TMPFS_MEMORY=1
+while getopts 't:p:w:m:' flag; do
   case ${flag} in
     t) TRUSTED_MODE=${OPTARG} ;;
     p) POSTGRES_MODE=${OPTARG} ;;
+    w) WAIT_SECS=${OPTARG} ;;
+    m) TMPFS_MEMORY=${OPTARG} ;;
     *) print_usage
        exit 1;;
   esac
@@ -63,19 +69,29 @@ REPLICA_INIT_SCRIPT=~/disk-tees/cloud_scripts/cloud_init/replica_init.sh
 if [ $TRUSTED_MODE == "local" ]
 then
   BUILD_DIR=$PROJECT_DIR/build
-  mkdir $BUILD_DIR
+  mkdir -p $BUILD_DIR
   cd $BUILD_DIR
 
   if [ $POSTGRES_MODE != "rollbaccine" ]
   then
-    
+    # Only launch client
+    CLIENT_DIR=$BUILD_DIR/client0
+    mkdir -p $CLIENT_DIR
+    NEW_INIT_SCRIPT=$CLIENT_DIR/client_init.sh
+    # Attach variables
+    $PROJECT_DIR/cloud_scripts/attach_var.sh -i $CLIENT_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
+    $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v 0
+    $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
+    # Run client
+    $NEW_INIT_SCRIPT
+    exit 0
   fi
   
   # 1. Create nodes for CCF (unnecessary)
   # 2. Launch CCF in the background
-  /opt/ccf_virtual/bin/sandbox.sh --verbose \
-    --package /opt/ccf_virtual/lib/libjs_generic \
-    --js-app-bundle $PROJECT_DIR/ccf &
+  # /opt/ccf_virtual/bin/sandbox.sh --verbose \
+  #   --package /opt/ccf_virtual/lib/libjs_generic \
+  #   --js-app-bundle $PROJECT_DIR/ccf > $BUILD_DIR/ccf.log 2>&1 &
   
   # Create CCF JSON. Note that IP include port, since it'll be used by CURL that way.
   CCF_JSON=$BUILD_DIR/ccf.json
@@ -95,18 +111,20 @@ then
   for ((i = 0; i < $NUM_REPLICAS; i++));
   do
     REPLICA_DIR=$BUILD_DIR/replica$i
-    mkdir $REPLICA_DIR
+    mkdir -p $REPLICA_DIR
     NEW_INIT_SCRIPT=$REPLICA_DIR/replica_init.sh
     # Attach CCF certificates and CCF JSON
-    $HOME_DIR/cloud_scripts/attach_file.sh -f $SERVICE_CERT -i $REPLICA_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
-    $HOME_DIR/cloud_scripts/attach_file.sh -f $USER_CERT -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
-    $HOME_DIR/cloud_scripts/attach_file.sh -f $USER_KEY -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
-    $HOME_DIR/cloud_scripts/attach_file.sh -f $CCF_JSON -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
+    $PROJECT_DIR/cloud_scripts/attach_file.sh -f $SERVICE_CERT -i $REPLICA_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
+    $PROJECT_DIR/cloud_scripts/attach_file.sh -f $USER_CERT -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
+    $PROJECT_DIR/cloud_scripts/attach_file.sh -f $USER_KEY -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
+    $PROJECT_DIR/cloud_scripts/attach_file.sh -f $CCF_JSON -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
     # Attach variables
-    $HOME_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
-    $HOME_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v $i
+    $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
+    $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v $i
+    $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n WAIT_SECS -v $WAIT_SECS
+    $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
     # Run replica in background
-    $NEW_INIT_SCRIPT &
+    # $NEW_INIT_SCRIPT > $REPLICA_DIR/log.txt 2>&1 &
   done
 
   # Create replica JSON
@@ -123,20 +141,21 @@ then
   echo ']' >> $REPLICA_JSON
 
   # 4. Launch client
-  CLIENT_DIR=$BUILD_DIR/client
-  mkdir $CLIENT_DIR
+  CLIENT_DIR=$BUILD_DIR/client0
+  mkdir -p $CLIENT_DIR
   NEW_INIT_SCRIPT=$CLIENT_DIR/client_init.sh
   # Attach CCF certificates and CCF JSON
-  $HOME_DIR/cloud_scripts/attach_file.sh -f $SERVICE_CERT -i $CLIENT_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
-  $HOME_DIR/cloud_scripts/attach_file.sh -f $USER_CERT -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
-  $HOME_DIR/cloud_scripts/attach_file.sh -f $USER_KEY -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
-  $HOME_DIR/cloud_scripts/attach_file.sh -f $CCF_JSON -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
-  $HOME_DIR/cloud_scripts/attach_file.sh -f $REPLICA_JSON -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
+  $PROJECT_DIR/cloud_scripts/attach_file.sh -f $SERVICE_CERT -i $CLIENT_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
+  $PROJECT_DIR/cloud_scripts/attach_file.sh -f $USER_CERT -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
+  $PROJECT_DIR/cloud_scripts/attach_file.sh -f $USER_KEY -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
+  $PROJECT_DIR/cloud_scripts/attach_file.sh -f $CCF_JSON -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
+  $PROJECT_DIR/cloud_scripts/attach_file.sh -f $REPLICA_JSON -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
   # Attach variables
-  $HOME_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
-  $HOME_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v 0
+  $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
+  $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v 0
+  $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
   # Run client
-  $BUILD_DIR/client/client_init.sh
+  # $NEW_INIT_SCRIPT
 
   exit 0
 fi

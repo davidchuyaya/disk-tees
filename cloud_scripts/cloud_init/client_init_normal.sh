@@ -21,5 +21,5 @@ cd $BUILD_DIR
 
 $HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_install.sh -t $TRUSTED_MODE
 DIR=${BUILD_DIR}/shim
-mkdir $DIR
+mkdir -p $DIR
 $HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR

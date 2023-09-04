@@ -30,9 +30,6 @@ void ReplicaFuse::addClientTLS(TLS<clientMsg>* tls) {
 }
 
 void ReplicaFuse::operator()(const mknodParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-    
     int res;
     if (S_ISFIFO(params.mode))
         res = mkfifo(REPLICA_PREPEND_PATH(params.path), params.mode);
@@ -42,27 +39,17 @@ void ReplicaFuse::operator()(const mknodParams &params) {
         std::cerr << "Unexpected failure to mknod at path: " << params.path << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const mkdirParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     int res = mkdir(REPLICA_PREPEND_PATH(params.path), params.mode);
     if (res == -1) {
         std::cerr << "Unexpected failure to mkdir at path: " << params.path << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const symlinkParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-    
     int res = symlink(params.target.c_str(), REPLICA_PREPEND_PATH(params.linkpath));
     if (res == -1) {
         std::cerr << "Unexpected failure to symlink from path " << params.target << " to path " << params.linkpath << ", errno: " << std::strerror(errno) << std::endl;
@@ -71,61 +58,38 @@ void ReplicaFuse::operator()(const symlinkParams &params) {
 }
 
 void ReplicaFuse::operator()(const unlinkParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     int res = unlink(REPLICA_PREPEND_PATH(params.path));
     if (res == -1) {
         std::cerr << "Unexpected failure to unlink at path: " << params.path << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const rmdirParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     int res = rmdir(REPLICA_PREPEND_PATH(params.path));
     if (res == -1) {
         std::cerr << "Unexpected failure to rmdir at path: " << params.path << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const renameParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     int res = rename(REPLICA_PREPEND_PATH(params.oldpath), REPLICA_PREPEND_PATH(params.newpath));
     if (res == -1) {
         std::cerr << "Unexpected failure to rename from path " << params.oldpath << " to path " << params.newpath << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const linkParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     int res = link(REPLICA_PREPEND_PATH(params.oldpath), REPLICA_PREPEND_PATH(params.newpath));
     if (res == -1) {
         std::cerr << "Unexpected failure to link from path " << params.oldpath << " to path " << params.newpath << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const chmodParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-    
     int res;
     if (params.hasFi)
         res = fchmod(fileHandleConverter.at(params.fi.fh), params.mode);
@@ -136,14 +100,9 @@ void ReplicaFuse::operator()(const chmodParams &params) {
             ", localFh: " << fileHandleConverter.at(params.fi.fh) << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const chownParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-    
     int res;
     if (params.hasFi)
         res = fchown(fileHandleConverter.at(params.fi.fh), params.uid, params.gid);
@@ -154,14 +113,9 @@ void ReplicaFuse::operator()(const chownParams &params) {
             ", localFh: " << fileHandleConverter.at(params.fi.fh) << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const truncateParams& params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     int res;
     if (params.hasFi)
         res = ftruncate(fileHandleConverter.at(params.fi.fh), params.size);
@@ -172,14 +126,9 @@ void ReplicaFuse::operator()(const truncateParams& params) {
             ", localFh: " << fileHandleConverter.at(params.fi.fh) << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const utimensParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-    
     int res;
     const timespec tv[]{params.tv0, params.tv1};
     if (params.hasFi)
@@ -191,14 +140,9 @@ void ReplicaFuse::operator()(const utimensParams &params) {
             ", localFh: " << fileHandleConverter.at(params.fi.fh) << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const createParams& params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     int localFd = open(REPLICA_PREPEND_PATH(params.path), params.fi.flags, params.mode);
     if (localFd == -1) {
         std::cerr << "Unexpected failure to create at path: " << params.path << ", errno: " << std::strerror(errno) << std::endl;
@@ -206,14 +150,9 @@ void ReplicaFuse::operator()(const createParams& params) {
     }
     fileHandleConverter[params.fi.fh] = localFd;
     // std::cout << "Fh " << params.fi.fh << " points to " << localFd << " at path " << params.path << std::endl;
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const openParams& params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     int localFd = open(REPLICA_PREPEND_PATH(params.path), params.fi.flags);
     if (localFd == -1) {
         std::cerr << "Unexpected failure to open at path: " << params.path << ", errno: " << std::strerror(errno) << std::endl;
@@ -221,28 +160,18 @@ void ReplicaFuse::operator()(const openParams& params) {
     }
     fileHandleConverter[params.fi.fh] = localFd;
     // std::cout << "Fh " << params.fi.fh << " points to " << localFd << " at path " << params.path << std::endl;
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const writeBufParams& params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     int res = pwrite(fileHandleConverter.at(params.fi.fh), params.buf.data(), params.buf.size(), params.offset);
     if (res == -1) {
         std::cerr << "Unexpected failure to write at fh: " << params.fi.fh <<
             ", localFh: " << fileHandleConverter.at(params.fi.fh) << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
-    }
-
-    postWriteCheck(params.seq); 
+    } 
 }
 
 void ReplicaFuse::operator()(const releaseParams& params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     int res = close(fileHandleConverter.at(params.fi.fh));
     if (res == -1) {
         std::cerr << "Unexpected failure to release at fh: " << params.fi.fh <<
@@ -250,52 +179,23 @@ void ReplicaFuse::operator()(const releaseParams& params) {
         exit(EXIT_FAILURE);
     }
     // std::cout << "Fh " << params.fi.fh << " no longer points to " << fileHandleConverter.at(params.fi.fh) << std::endl;
-    fileHandleConverter.erase(params.fi.fh);
-
-    postWriteCheck(params.seq); 
+    fileHandleConverter.erase(params.fi.fh); 
 }
 
 void ReplicaFuse::operator()(const fsyncParams& params) {
-    // Can't use standard preWriteCheck, since we want to add this to pendingFsyncs instead of pendingWrites
-    // Code is mostly copy pasted from preWriteCheck though
-    if (params.r < highestBallot) {
-        std::cout << "Attempted fsync with ballot " << params.r << " when highestBallot is " << highestBallot << std::endl;
-        return;
-    }
-    if (params.r != normalBallot) {
-        std::cout << "Storing fsync with ballot " << params.r << " because current normalBallot is too low: " << normalBallot << std::endl;
-        pendingFsyncs[params.seq] = params;
-        return;
-    }
-    if (params.seq > written) {
-        std::cout << "Fsync arrived for seq " << params.seq << " and written is not high enough yet: " << written << std::endl;
-        pendingFsyncs[params.seq] = params;
-        return;
-    }
     // Reply to client to confirm commit
     clientTLS->send<replicaMsg>(fsyncAck {
         .id = id,
         .written = written,
         .r = params.r
     }, client);
-    pendingFsyncs.erase(params.seq);
-
-    // Don't use postWriteCheck, since written was not incremented
 }
 
 void ReplicaFuse::operator()(const fallocateParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-
     posix_fallocate(fileHandleConverter.at(params.fi.fh), params.offset, params.length);
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const setxattrParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-    
     // std::cout << "setxattr at path: " << params.path << ", name: " << params.name << ", value: " << params.value << ", flags: " << params.flags << std::endl;
     
     int res = lsetxattr(REPLICA_PREPEND_PATH(params.path), params.name.c_str(), params.value.data(), params.value.size(), params.flags);
@@ -303,27 +203,17 @@ void ReplicaFuse::operator()(const setxattrParams &params) {
         std::cerr << "Unexpected failure to setxattr at path: " << params.path << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const removexattrParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-    
     int res = lremovexattr(REPLICA_PREPEND_PATH(params.path), params.name.c_str());
     if (res == -1) {
         std::cerr << "Unexpected failure to removexattr at path: " << params.path << ", errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const copyFileRangeParams &params) {
-    if (!preWriteCheck(params.seq, params.r, params))
-        return;
-    
     off_t off_in = params.off_in;
     off_t off_out = params.off_out;
     int res = copy_file_range(fileHandleConverter.at(params.fi_in.fh), &off_in, fileHandleConverter.at(params.fi_out.fh), &off_out, params.len, params.flags);
@@ -331,8 +221,6 @@ void ReplicaFuse::operator()(const copyFileRangeParams &params) {
         std::cerr << "Unexpected failure to copy_file_range, errno: " << std::strerror(errno) << std::endl;
         exit(EXIT_FAILURE);
     }
-
-    postWriteCheck(params.seq);
 }
 
 void ReplicaFuse::operator()(const p1a& msg) {
@@ -448,7 +336,9 @@ void ReplicaFuse::operator()(const p2a& msg) {
     normalBallot = msg.r;
     written = msg.written;
     pendingWrites = {};
-    pendingFsyncs = {};
+    lastAckedWrite = msg.written;
+    lastFsync = {-1, {0,0,0}, {0, 0}};
+    fsyncRecvTime = {};
     fileHandleConverter = {};
 
     // Reply to client
@@ -463,43 +353,107 @@ void ReplicaFuse::operator()(const p2a& msg) {
  * Helper functions
 */
 
-bool ReplicaFuse::preWriteCheck(const int seq, const ballot& r, const clientMsg& msg) {
+void ReplicaFuse::bufferMsg(const clientMsg& msg, const std::string& addr) {
+    sender = addr;
+
+    if (getBallot(msg) < highestBallot) {
+        std::cout << "Received message with ballot " << getBallot(msg) << " when highestBallot is " << highestBallot << std::endl;
+        return;
+    }
+
+    int seq;
+    switch (getClientMsgType(msg)) {
+        case Write:
+            // Broadcast to other replicas
+            if (sender != client)
+                clientTLS->broadcast<clientMsg>(msg, replicas);
+            // Don't buffer if message can be immediately processed
+            seq = getSeq(msg);
+            if (seq == written + 1 && ballotIsValid(getBallot(msg))) {
+                std::visit(*this, msg);
+                written += 1;
+            }   
+            else
+                pendingWrites[seq] = msg;
+            break;
+        case Fsync:
+            // Don't buffer if message can be immediately processed
+            seq = getSeq(msg);
+            if (seq <= written && ballotIsValid(getBallot(msg)))
+                std::visit(*this, msg);
+            else {
+                lastFsync = std::get<fsyncParams>(msg);
+                fsyncRecvTime = now();
+            }
+            break;
+        case Protocol:
+            // Immediately process protocol messages
+            std::visit(*this, msg);
+            break;
+    }
+}
+
+void ReplicaFuse::processPendingMessages() {
+    // Process messages until we can't process any more
+    bool processedMsg = false;
+    do {
+        int nextWrite = written + 1;
+        if (pendingWrites.contains(nextWrite)) {
+            clientMsg& msg = pendingWrites[nextWrite];
+            if (ballotIsValid(getBallot(msg))) {
+                std::visit(*this, msg);
+                processedMsg = true;
+                written += 1;
+                pendingWrites.erase(nextWrite);
+            }       
+        }
+    } while (processedMsg);
+
+    // Send fsync ack if possible
+    if (lastFsync.seq <= written && lastFsync.seq > lastAckedWrite && ballotIsValid(lastFsync.r)) {
+        (*this)(lastFsync);
+        lastAckedWrite = written;
+    }
+}
+
+void ReplicaFuse::checkFsyncTimeout() {
+    if (lastFsync.seq <= lastAckedWrite) // Already acknowledged
+        return;
+    if (!ballotIsValid(lastFsync.r))
+        return;
+    if (fsyncRecvTime == std::chrono::steady_clock::time_point{}) // Already sent fsyncMissing
+        return;
+    if (std::chrono::duration_cast<std::chrono::minutes>(now() - fsyncRecvTime) < FSYNC_TIMEOUT) // Not timed out yet
+        return;
+
+    // Calculate fsync holes
+    std::vector<int> holes = {};
+    for (int i = written + 1; i <= lastFsync.seq; i++) {
+        if (!pendingWrites.contains(i))
+            holes.push_back(i);
+    }
+
+    clientTLS->send<replicaMsg>(
+        fsyncMissing{
+            .id = id,
+            .r = lastFsync.r,
+            .fsyncSeq = lastFsync.seq,
+            .holes = holes,
+        },
+        client);
+    fsyncRecvTime = {};
+}
+
+bool ReplicaFuse::ballotIsValid(const ballot& r) {
     if (r < highestBallot) {
         std::cout << "Attempted write with ballot " << r << " when highestBallot is " << highestBallot << std::endl;
         return false;
     }
     if (r != normalBallot) {
         std::cout << "Storing write with ballot " << r << " because current normalBallot is too low: " << normalBallot << std::endl;
-        pendingWrites[seq] = msg; 
         return false;
-    }
-    if (seq != written + 1) {
-        std::cout << "Attempted write at seq " << seq << " when written is " << written << std::endl;
-        pendingWrites[seq] = msg;
-        return false;
-    }
-    // Broadcast to other replicas
-    if (sender != client) {
-        clientTLS->broadcast<clientMsg>(msg, replicas);
     }
     return true;
-}
-
-// TODO: Change into while loop to avoid recursion
-void ReplicaFuse::postWriteCheck(const int seq) {
-    pendingWrites.erase(seq);
-
-    // check fsync
-    const auto& f = pendingFsyncs.find(seq);
-    if (f != pendingFsyncs.end())
-        (*this)(f->second);
-
-    written++;
-
-    // check pending writes
-    const auto& w = pendingWrites.find(seq);
-    if (w != pendingWrites.end())
-        std::visit(*this, w->second);
 }
 
 std::chrono::steady_clock::time_point ReplicaFuse::now() {

@@ -55,17 +55,17 @@ int main(int argc, char* argv[]) {
     std::string name = "replica" + std::to_string(conf.id);
 
     ReplicaFuse replicaFuse(conf.id, name, conf.trustedMode, path + "/storage", ccfConf, path);
-    TLS<clientMsg> clientTLS(conf.id, name, Replica, {}, path,
-        [&](const clientMsg& payload, const std::string& addr) {
-        replicaFuse.sender = addr;
-        // Essentially a switch statement matching the possible types of messages
-        std::visit(replicaFuse, payload);
+    TLS<clientMsg> clientTLS(conf.id, name, Replica, {}, path, [&](const clientMsg& payload, const std::string& addr) {
+       replicaFuse.bufferMsg(payload, addr);
     });
     replicaFuse.addClientTLS(&clientTLS);
 
     while (true) {
-        // Listen forever
-        clientTLS.runEventLoopOnce(-1);
+        // Listen forever. Wake at least once every 5000ms in case fsync times out.
+        clientTLS.runEventLoopOnce(5000);
+        // Process all messages in the queue
+        replicaFuse.processPendingMessages();
+        replicaFuse.checkFsyncTimeout();
     }
 
     return 0;

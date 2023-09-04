@@ -205,24 +205,27 @@ struct copyFileRangeParams {
 };
 
 struct p1a {
+    int seq; // Unused, included for getSeq
     ballot r;
     networkConfig netConf;
 };
 
 struct diskReq {
+    int seq; // Unused, included for getSeq
     int id;
     ballot r;
 };
 
 struct p2a {
+    int seq; // Unused, included for getSeq
     ballot r;
     int written;
     std::string diskReplicaName;
     std::string diskChecksum;
 };
 
-// Add to variant as the number of variants increase
-typedef std::variant<mknodParams, 
+// Add to variant as the number of message types increase and modify the index in getClientMsgType as necessary
+typedef std::variant<mknodParams, // Writes start here
                     mkdirParams, 
                     symlinkParams,
                     unlinkParams,
@@ -237,14 +240,35 @@ typedef std::variant<mknodParams,
                     openParams,
                     writeBufParams,
                     releaseParams,
-                    fsyncParams,
                     fallocateParams,
                     setxattrParams,
                     removexattrParams,
                     copyFileRangeParams,
-                    p1a,
+                    fsyncParams, // Fsync
+                    p1a, // Protocol messages start here
                     diskReq,
                     p2a> clientMsg;
+
+enum ClientMsgType {
+    Write, Fsync, Protocol
+};
+
+inline ClientMsgType getClientMsgType(const clientMsg& msg) {
+    if (msg.index() < 18)
+        return Write;
+    else if (msg.index() == 18)
+        return Fsync;
+    else
+        return Protocol;
+}
+
+inline int getSeq(const clientMsg& msg) {
+    return std::visit([](auto& obj) { return obj.seq; }, msg);
+}
+
+inline ballot getBallot(const clientMsg& msg) {
+    return std::visit([](auto& obj) { return obj.r; }, msg);
+}
 
 struct p1b {
     int id;

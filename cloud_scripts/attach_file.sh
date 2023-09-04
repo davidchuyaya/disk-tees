@@ -23,9 +23,15 @@ done
 # Remove newlines with base64
 FILE64=$(base64 -w 0 $FILE)
 # Remove the extension for the bash variable name
-FILE_NAME=$(echo "${FILE%.*}")
+FILE_NAME=$(echo $(basename "${FILE%.*}"))
+FILE_NAME_WITH_EXTENSION=$(echo $(basename "${FILE}"))
 # Create a line to decode the file and output it
-RECREATE_FILE='echo $'${FILE_NAME}' | base64 -d > '${DIR}/${FILE}
+RECREATE_FILE='echo $'${FILE_NAME}' | base64 -d > '${DIR}/${FILE_NAME_WITH_EXTENSION}
 # Insert the variable and line
-sed "2i ${FILE_NAME}=${FILE64} \n ${RECREATE_FILE}" $INPUT > $OUTPUT
-chmod +x $OUTPUT
+if [ $INPUT = $OUTPUT ]
+then
+  sed -i "2i ${FILE_NAME}=${FILE64} \n ${RECREATE_FILE}" $INPUT
+else
+  sed "2i ${FILE_NAME}=${FILE64} \n ${RECREATE_FILE}" $INPUT > $OUTPUT
+  chmod +x $OUTPUT
+fi

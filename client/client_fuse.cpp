@@ -79,7 +79,10 @@ void ClientFuse::operator()(const p2b& msg) {
 }
 
 void ClientFuse::operator()(const fsyncMissing& msg) {
-	// TODO: Implement
+	for (int hole : msg.holes) {
+		if (uncommittedWrites.contains(hole))
+			replicaTLS->send(uncommittedWrites.at(hole), sender);
+	}
 }
 
 void ClientFuse::operator()(const fsyncAck& msg) {
@@ -88,14 +91,23 @@ void ClientFuse::operator()(const fsyncAck& msg) {
 	if (replicasCommitted >= msg.written)
 		return;
 
-	int numWritten = 0;
+	// Find the largest value a quorum of replicas have written
+	int largestQuorumWritten = -1;
 	for (auto& [id, written] : replicaWritten) {
-		if (written == msg.written)
-			numWritten++;
+		if (written <= largestQuorumWritten)
+			continue;
+
+		int numWritten = 0;
+		for (auto& [otherId, otherWritten] : replicaWritten) {
+			if (otherWritten >= written)
+				numWritten += 1;
+		}
+		if (numWritten >= quorum)
+			largestQuorumWritten = written;
 	}
 
-	if (numWritten >= quorum) {
-		replicasCommitted = msg.written;
+	if (largestQuorumWritten > replicasCommitted) {
+		replicasCommitted = largestQuorumWritten;
 		uncommittedWrites.clear();
 	}
 }
@@ -205,7 +217,8 @@ int ClientFuse::client_readdir(const char* path, void *buf, fuse_fill_dir_t fill
 
 	// Check network (non-blocking).
 	// NOTE: If the client is not performing writes and a new replica wants to reconfigure, because FUSE controls the event loop (not us), we can't receive messages. As a workaround, fuse_waker.sh performs "ls" on the FUSE directory every couple of seconds, which triggers this function and allows us to check incoming messages.
-	replicaTLS->runEventLoopOnce(0);
+	if (network)
+		replicaTLS->runEventLoopOnce(0);
 
 	return 0;
 }
@@ -295,14 +308,14 @@ int ClientFuse::client_mknod(const char *path, mode_t mode, dev_t rdev) {
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(mknodParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, mknodParams {
 			.seq = written,
 			.r = r,
 			.path = std::string(path),
 			.mode = mode,
 			.rdev = rdev
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -315,13 +328,13 @@ int ClientFuse::client_mkdir(const char *path, mode_t mode) {
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(mkdirParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, mkdirParams {
 			.seq = written,
 			.r = r,
 			.path = std::string(path),
 			.mode = mode
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 	
 	return 0;
@@ -335,13 +348,13 @@ int ClientFuse::client_symlink(const char *target, const char *linkpath) {
 	
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(symlinkParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, symlinkParams {
 			.seq = written,
 			.r = r,
 			.target = std::string(target),
 			.linkpath = std::string(linkpath)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -354,12 +367,12 @@ int ClientFuse::client_unlink(const char *path) {
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(unlinkParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, unlinkParams {
 			.seq = written,
 			.r = r,
 			.path = std::string(path)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 	   
     return 0;
@@ -372,12 +385,12 @@ int ClientFuse::client_rmdir(const char *path) {
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(rmdirParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, rmdirParams {
 			.seq = written,
 			.r = r,
 			.path = std::string(path)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -390,13 +403,13 @@ int ClientFuse::client_rename(const char *oldpath, const char *newpath, unsigned
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(renameParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, renameParams {
 			.seq = written,
 			.r = r,
 			.oldpath = std::string(oldpath),
 			.newpath = std::string(newpath)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -409,13 +422,13 @@ int ClientFuse::client_link(const char *oldpath, const char *newpath) {
 	
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(linkParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, linkParams {
 			.seq = written,
 			.r = r,
 			.oldpath = std::string(oldpath),
 			.newpath = std::string(newpath)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -433,7 +446,7 @@ int ClientFuse::client_chmod(const char *path, mode_t mode, fuse_file_info *fi) 
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(chmodParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, chmodParams {
 			.seq = written,
 			.r = r,
 			.path = hasFi ? "" : std::string(path),
@@ -441,7 +454,7 @@ int ClientFuse::client_chmod(const char *path, mode_t mode, fuse_file_info *fi) 
 			.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
 			.hasFi = hasFi
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -459,7 +472,7 @@ int ClientFuse::client_chown(const char *path, uid_t uid, gid_t gid, fuse_file_i
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(chownParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, chownParams {
 			.seq = written,
 			.r = r,
 			.path = hasFi ? "" : std::string(path),
@@ -468,7 +481,7 @@ int ClientFuse::client_chown(const char *path, uid_t uid, gid_t gid, fuse_file_i
 			.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
 			.hasFi = hasFi
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -486,7 +499,7 @@ int ClientFuse::client_truncate(const char* path, off_t size, fuse_file_info *fi
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(truncateParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, truncateParams {
 			.seq = written,
 			.r = r,
 			.path = hasFi ? "" : std::string(path),
@@ -494,7 +507,7 @@ int ClientFuse::client_truncate(const char* path, off_t size, fuse_file_info *fi
 			.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
 			.hasFi = hasFi
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
     return 0;
@@ -512,7 +525,7 @@ int ClientFuse::client_utimens(const char *path, const timespec tv[2], fuse_file
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(utimensParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, utimensParams {
 			.seq = written,
 			.r = r,
 			.path = hasFi ? "" : std::string(path),
@@ -521,7 +534,7 @@ int ClientFuse::client_utimens(const char *path, const timespec tv[2], fuse_file
 			.fi = hasFi ? make_lite(fi) : fuse_file_info_lite(),
 			.hasFi = hasFi
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -537,14 +550,14 @@ int ClientFuse::client_create(const char *path, mode_t mode, fuse_file_info *fi)
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(createParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, createParams {
 			.seq = written,
 			.r = r,
 			.path = std::string(path),
 			.mode = mode,
 			.fi = make_lite(fi)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -561,13 +574,13 @@ int ClientFuse::client_open(const char *path, fuse_file_info *fi) {
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(openParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, openParams {
 			.seq = written,
 			.r = r,
 			.path = std::string(path),
 			.fi = make_lite(fi)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -590,14 +603,14 @@ int ClientFuse::client_write_buf(const char *path, fuse_bufvec *buf, off_t offse
 		mem.insert(mem.end(), bufStart, bufStart + bufSize - buf->off);
 		// 2. Send mem
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(writeBufParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, writeBufParams {
 			.seq = written,
 			.r = r,
 			.offset = offset,
 			.buf = mem,
 			.fi = make_lite(fi)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return fuse_buf_copy(&dst, buf, FUSE_BUF_SPLICE_NONBLOCK);
@@ -609,12 +622,12 @@ int ClientFuse::client_release(const char *path, fuse_file_info *fi) {
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(releaseParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, releaseParams {
 			.seq = written,
 			.r = r,
 			.fi = make_lite(fi)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
     return 0;
@@ -651,14 +664,14 @@ int ClientFuse::client_fallocate(const char *path, int mode, off_t offset, off_t
 
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(fallocateParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, fallocateParams {
 			.seq = written,
 			.r = r,
 			.offset = offset,
 			.length = length,
 			.fi = make_lite(fi)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return -res;
@@ -674,7 +687,7 @@ int ClientFuse::client_setxattr(const char *path, const char *name, const char *
 		std::vector<char> valueVec;
 		valueVec.insert(valueVec.end(), value, value + size);
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(setxattrParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, setxattrParams {
 			.seq = written,
 			.r = r,
 			.path = std::string(path),
@@ -682,7 +695,7 @@ int ClientFuse::client_setxattr(const char *path, const char *name, const char *
 			.value = valueVec,
 			.flags = flags
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;
@@ -694,14 +707,14 @@ int ClientFuse::client_removexattr(const char *path, const char *name) {
 		return -errno;
 
 	if (network) {
-	written += 1;
-		auto& msg = uncommittedWrites.emplace_back(removexattrParams {
+		written += 1;
+		auto [msg, success] = uncommittedWrites.try_emplace(written, removexattrParams {
 			.seq = written,
 			.r = r,
 			.path = std::string(path),
 			.name = std::string(name)
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 	
 	return 0;
@@ -714,7 +727,7 @@ int ClientFuse::client_copy_file_range(const char *path_in, fuse_file_info *fi_i
 	
 	if (network) {
 		written += 1;
-		auto& msg = uncommittedWrites.emplace_back(copyFileRangeParams {
+		auto [msg, success] = uncommittedWrites.try_emplace(written, copyFileRangeParams {
 			.seq = written,
 			.r = r,
 			.fi_in = make_lite(fi_in),
@@ -724,7 +737,7 @@ int ClientFuse::client_copy_file_range(const char *path_in, fuse_file_info *fi_i
 			.len = len,
 			.flags = flags
 		});
-		replicaTLS->sendRoundRobin<clientMsg>(msg, replicas);
+		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
 	}
 
 	return 0;

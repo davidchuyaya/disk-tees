@@ -8,6 +8,8 @@
 # Assumes the following variables will be inserted via attach_var.sh:
 #   TRUSTED_MODE: "local", "trusted", or "untrusted"
 #   ID: client ID
+#   TMPFS_MEMORY: how much memory to allocate to tmpfs (in Gb)
+#   WAIT_SECS: how long to wait between starting the client and starting postgres
 
 if [ $TRUSTED_MODE == "local" ]; then
     HOME_DIR=~
@@ -35,28 +37,27 @@ done
 
 # Create directory to store files
 TMPFS_DIR=${BUILD_DIR}/storage
-mkdir $TMPFS_DIR
-#TODO: Figure out how large to make tmpfs (how many Gb)
-sudo mount -t tmpfs -o size=2G tmpfs $TMPFS_DIR
+mkdir -p $TMPFS_DIR
+sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $TMPFS_DIR
 
 # Create a separate tmpfs directory, so we have a place to put the zipped storage directory when creating/sending it
 ZIPPED_DIR=$BUILD_DIR/zipped-storage
-mkdir $ZIPPED_DIR
-# TODO: Figure out how large to make tmpfs (how many Gb)
-sudo mount -t tmpfs -o size=2G tmpfs $ZIPPED_DIR
+mkdir -p $ZIPPED_DIR
+sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $ZIPPED_DIR
 
 # Create directory that postgres interfaces with, where operations are intercepted and redirected
 DIR=${BUILD_DIR}/shim
-mkdir $DIR
+mkdir -p $DIR
 
 # Start background process to make sure FUSE checks for messages periodically
 $HOME_DIR/disk-tees/cloud_scripts/fuse_waker.sh -n $NAME -t $TRUSTED_MODE &
 
-$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_install.sh -t $TRUSTED_MODE
-# Make tee_fuse, mount it on $DIR and redirect to $TMPFS_DIR
-RUN_SCRIPT="$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR"
+# Make tee_fuse and mount it on $DIR
 cd $HOME_DIR/disk-tees
 cmake .
 make
 cd $BUILD_DIR
-$HOME_DIR/disk-tees/client/tee_fuse -i $ID -t $TRUSTED_MODE -n --run=$RUN_SCRIPT -f -s $DIR
+$HOME_DIR/disk-tees/client/tee_fuse -i $ID -t $TRUSTED_MODE -n -f -s $DIR
+sleep $WAIT_SECS
+$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_install.sh -t $TRUSTED_MODE
+$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR

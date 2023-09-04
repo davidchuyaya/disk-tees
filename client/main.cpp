@@ -1,4 +1,5 @@
 #include <chrono>
+#include <thread>
 #include "client_fuse.hpp"
 #include "../shared/network_config.hpp"
 #include "../shared/tls.hpp"
@@ -12,7 +13,6 @@ static struct config {
     int id;
     bool network;
     const char* trustedMode;
-    const char* runScript;
 } config;
 
 // Fuse parsing logic from: https://github.com/libfuse/libfuse/blob/master/example/hello.c
@@ -21,7 +21,6 @@ static const struct fuse_opt config_spec[] = {
 	OPTION("-i %d", id),
     OPTION("-t %s", trustedMode),
     OPTION("-n", network),
-    OPTION("--run=%s", runScript),
 	FUSE_OPT_END
 };
 
@@ -66,9 +65,11 @@ int main(int argc, char* argv[]) {
     networkConfig replicaConf = NetworkConfig::readNetworkConfig("replicas.json");
 
     // 1. Send MatchA to CCF, wait for MatchB
+    std::cout << "Beginning matchmaking phase" << std::endl;
     CCFNetwork ccfNetwork(path, ccfConf);
     matchB matchmakeResult = matchmake(ccfNetwork, config.id, ccfConf);
     ballot r = matchmakeResult.r;
+    std::cout << "Matchmaking complete" << std::endl;
 
     // 2. Find the replica addresses for the current config
     addresses replicas = NetworkConfig::configToAddrs(Replica, replicaConf);
@@ -83,20 +84,25 @@ int main(int argc, char* argv[]) {
     addresses allReplicas = NetworkConfig::configToAddrs(Replica, allReplicasConf);
     
     // 4. Connect to all replicas
+    std::cout << "Connecting to replicas" << std::endl;
     ClientFuse fuse(config.network, r, path + "/storage", quorum, replicas);
     TLS<replicaMsg> replicaTLS(config.id, name, Client, allReplicasConf, path,
         [&](const replicaMsg& payload, const std::string& addr) {
+            fuse.sender = addr;
             std::visit(fuse, payload);
     });
+    std::cout << "Connected to replicas" << std::endl;
     fuse.addTLS(&replicaTLS);
 
     // 5. Broadcast p1as
     replicaTLS.broadcast<clientMsg>(p1a { 
+        .seq = 0,
         .r = r,
         .netConf = replicaConf
     }, allReplicas);
 
     // 6. Process p1bs
+    std::cout << "Broadcasted p1a to replicas, waiting for p1b quorum" << std::endl;
     while (!fuse.p1bQuorum(matchmakeResult.configs)) {
         replicaTLS.runEventLoopOnce(-1);
     }
@@ -108,10 +114,12 @@ int main(int argc, char* argv[]) {
         p1b highestRanking = fuse.highestRankingP1b();
         if (highestRanking.written < 0) {
             noPriorState = true;
+            std::cout << "No prior state, don't need to request disk" << std::endl;
             break;
         }
 
-        replicaTLS.send<clientMsg>(diskReq{.id = config.id, .r = r},
+        std::cout << "P1b quorum reached, requesting disk from replica: " << highestRanking.id << std::endl;
+        replicaTLS.send<clientMsg>(diskReq{.seq = 0, .id = config.id, .r = r},
                                    allReplicasConf[highestRanking.id]);
 
         // Wait for disk response until timeout
@@ -142,6 +150,7 @@ int main(int argc, char* argv[]) {
                     copiedDisk = true;
                     fuse.written = disk.written;
                     diskMsg = disk;
+                    std::cout << "Copied disk from replica" << std::endl;
                     break;
                 }
             }
@@ -161,6 +170,7 @@ int main(int argc, char* argv[]) {
 
     // 8. Rebroadcast disk (p2a)
     if (!noPriorState) {
+        std::cout << "Rebroadcasting disk" << std::endl;
         std::string replicaName = "replica" + std::to_string(diskMsg.id);
         for (auto& [id, ip] : replicaConf) {
             if (id != diskMsg.id) {
@@ -181,7 +191,9 @@ int main(int argc, char* argv[]) {
     fuse.successfulP1bs.clear();
     fuse.diskChecksums.clear();
 
+    std::cout << "Broadcasting p2a to replicas" << std::endl;
     replicaTLS.broadcast<clientMsg>(p2a {
+        .seq = 0,
         .r = r,
         .written = fuse.written,
         .diskReplicaName = noPriorState ? "" : "replica" + std::to_string(diskMsg.id),
@@ -190,6 +202,7 @@ int main(int argc, char* argv[]) {
     while (fuse.successfulP2bs.size() < quorum) {
         replicaTLS.runEventLoopOnce(-1);
     }
+    std::cout << "P2b quorum reached, leader election complete!" << std::endl;
 
     // 9. Kill old replicas, if there are any
     if (allReplicasConf.size() > replicaConf.size()) {
@@ -197,8 +210,5 @@ int main(int argc, char* argv[]) {
         // Note: We can't actually kill replicas from here. Rely on trusted admin once they see the replica's no longer in the config.
     }
 
-    // TODO: run in background
-    system(config.runScript);
-    
     return fuse.run(args.argc, args.argv);
 }
