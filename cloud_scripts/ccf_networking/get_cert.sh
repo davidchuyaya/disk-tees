@@ -11,7 +11,7 @@ if (( $# == 0 )); then
     exit 1
 fi
 
-while getopts 'a:i:n:' flag; do
+while getopts 'a:i:n:t:' flag; do
   case ${flag} in
     a) ADDRESS=${OPTARG} ;;
     i) ID=${OPTARG} ;;

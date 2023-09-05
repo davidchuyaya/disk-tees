@@ -138,7 +138,7 @@ int main(int argc, char* argv[]) {
             bool copiedDisk = false;
             for (const auto& disk : fuse.diskChecksums) {
                 std::ostringstream ss;
-                ss << path << "../../cloud_scripts/unzip_disk.sh";
+                ss << path << "/../../cloud_scripts/unzip_disk.sh";
                 ss << " -s replica" << disk.id;
                 ss << " -d " << name;
                 ss << " -t " << config.trustedMode;
@@ -176,7 +176,7 @@ int main(int argc, char* argv[]) {
             if (id != diskMsg.id) {
                 // Send the disk
                 std::ostringstream ss;
-                ss << path << "../../cloud_scripts/send_disk.sh";
+                ss << path << "/../../cloud_scripts/send_disk.sh";
                 ss << " -s " << replicaName;
                 ss << " -d replica" << id;
                 ss << " -a " << ip << ":" << NetworkConfig::getPort(Replica, id);

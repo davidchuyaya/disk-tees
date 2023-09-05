@@ -18,13 +18,13 @@ else
 fi
 
 NAME=replica${ID}
-$BUILD_DIR=$HOME_DIR/disk-tees/build/$NAME
+BUILD_DIR=$HOME_DIR/disk-tees/build/$NAME
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 
 # Create certificates and send them to CCF
 $HOME_DIR/disk-tees/cloud_scripts/create_cert.sh -t $TRUSTED_MODE -n $NAME
-CCF_ADDR=$(jq '.[0].ip' ${BUILD_DIR}/ccf.json)
+CCF_ADDR=$(jq -r '.[0].ip' ${BUILD_DIR}/ccf.json)
 $HOME_DIR/disk-tees/cloud_scripts/ccf_networking/add_cert.sh -a $CCF_ADDR -i $ID -n $NAME -t "replica"
 # Download the client's certificate. Assume that the client's ID is 0.
 $HOME_DIR/disk-tees/cloud_scripts/ccf_networking/get_cert.sh -a $CCF_ADDR -i 0 -n "client0" -t "client"
@@ -45,4 +45,4 @@ cmake .
 make
 cd $BUILD_DIR
 # Run in background so startup script can terminate
-$HOME_DIR/disk-tees/replica/disk-tees -i $ID -t $TRUSTED_MODE &
+$HOME_DIR/disk-tees/replica/disk_tees -i $ID -t $TRUSTED_MODE &

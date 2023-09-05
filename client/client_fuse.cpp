@@ -558,7 +558,7 @@ int ClientFuse::client_create(const char *path, mode_t mode, fuse_file_info *fi)
 			.fi = make_lite(fi)
 		});
 		replicaTLS->sendRoundRobin<clientMsg>(msg->second, replicas);
-	}
+    }
 
 	return 0;
 }
@@ -650,10 +650,12 @@ int ClientFuse::client_fsync(const char *path, int isdatasync, fuse_file_info *f
 			.fi = make_lite(fi)
 		}, replicas);
 
-		// block until fsync is acknowledged by quorum
+		// std::cout << "Waiting on fsync with written: " << written << std::endl;
+        // block until fsync is acknowledged by quorum
 		while (replicasCommitted < written) {
 			replicaTLS->runEventLoopOnce(-1);
 		}
+		// std::cout << "Completed fsync with written: " << written << std::endl;
 	}
 
     return 0;

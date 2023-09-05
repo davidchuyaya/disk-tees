@@ -42,11 +42,6 @@ void TLS<RecvMsg>::startServer()
     // Ignore broken pipe signals
     signal(SIGPIPE, SIG_IGN);
 
-    serverCtx = SSL_CTX_new(TLS_server_method());
-    SSL_CTX_set_verify(serverCtx, SSL_VERIFY_PEER, NULL);
-    loadAcceptableCertificates(serverCtx);
-    loadOwnCertificates(serverCtx);
-
     struct sockaddr_in addr;
     addr.sin_family = AF_INET;
     addr.sin_port = htons(NetworkConfig::getPort(ownType, id));
@@ -84,6 +79,11 @@ int TLS<RecvMsg>::acceptConnection() {
     }
 
     std::cout << "Client TCP connection accepted" << std::endl;
+
+    SSL_CTX* serverCtx = SSL_CTX_new(TLS_server_method());
+    SSL_CTX_set_verify(serverCtx, SSL_VERIFY_PEER, NULL);
+    loadAcceptableCertificates(serverCtx);
+    loadOwnCertificates(serverCtx);
 
     SSL *ssl = SSL_new(serverCtx);
     SSL_set_fd(ssl, client);
@@ -169,14 +169,19 @@ void TLS<RecvMsg>::connectToServer(const int peerId, const std::string& peerIp) 
 template <class RecvMsg>
 void TLS<RecvMsg>::runEventLoopOnce(const int timeout) {
     int rc = poll(openSockets.data(), openSockets.size(), timeout);
+    if (rc == 0) // Timed out
+        return;
 
     std::vector<int> newSockets;
     std::vector<int> deletedSocketIndices;
     for (int i = 0; i < openSockets.size(); i++) {
         pollfd& sock = openSockets[i];
+        // std::cout << "Checking addr " << addrFromSocket[sock.fd] << " for messages" << std::endl;
 
         if (sock.revents == 0)
             continue;
+
+        // std::cout << "Found message from addr " << addrFromSocket[sock.fd] << std::endl;
         
         // Server listens for connections
         if (sock.fd == serverSocket) {
@@ -187,15 +192,16 @@ void TLS<RecvMsg>::runEventLoopOnce(const int timeout) {
         else {
             // Listen to socket
             try {
-                RecvMsg recvPayload = recv(sock.fd, sslFromSocket.at(sock.fd));
-                onRecv(recvPayload, addrFromSocket.at(sock.fd));
-            }
-            catch (const std::exception& e) { // on exception, close connection
-                memset(readBuffer, 0, READ_BUFFER_SIZE); // Clear read buffer in case it's corrupted
+                std::optional<RecvMsg> recvPayload = recv(sock.fd, sslFromSocket.at(sock.fd));
+                if (recvPayload.has_value())
+                    onRecv(recvPayload.value(), addrFromSocket.at(sock.fd));
+            } catch (const std::exception& e) {           // on exception, close connection
+                memset(readBuffer, 0, READ_BUFFER_SIZE);  // Clear read buffer in case it's corrupted
                 std::cout << e.what() << std::endl;
                 closeSocket(sock.fd);
                 deletedSocketIndices.emplace_back(i);
             }
+            // std::cout << "Completed message receive" << std::endl;
         }
     }
 
@@ -225,6 +231,21 @@ void TLS<RecvMsg>::closeSocket(const int sock) {
 
 template <class RecvMsg>
 template <class SendMsg>
+void TLS<RecvMsg>::broadcastExcept(const SendMsg& payload, const std::string& doNotBroadcastToAddr) {
+    for (const auto& [addr, ssl] : sslFromAddr) {
+        // send to address if the connection exists
+        if (addr != doNotBroadcastToAddr) {
+            try {
+                send<SendMsg>(payload, addr);
+            } catch (const std::exception& e) {
+                std::cout << "Failed to broadcast to addr: " << addr << std::endl;
+            }  // If it's an actual connection failure, the recv will eventually fail
+        }
+    }
+}
+
+template <class RecvMsg>
+template <class SendMsg>
 void TLS<RecvMsg>::broadcast(const SendMsg& payload, const addresses& dests) {
     for (const std::string& addr : dests) {
         // send to address if the connection exists
@@ -232,8 +253,12 @@ void TLS<RecvMsg>::broadcast(const SendMsg& payload, const addresses& dests) {
             try {
                 send<SendMsg>(payload, addr);
             }
-            catch (const std::exception& e) {} // If it's an actual connection failure, the recv will eventually fail
+            catch (const std::exception& e) {
+                std::cout << "Failed to broadcast to addr: " << addr << std::endl;
+            } // If it's an actual connection failure, the recv will eventually fail
         }
+        else
+            std::cout << "Could not broadcast to address: " << addr << std::endl;
     }
 }
 
@@ -241,6 +266,7 @@ template <class RecvMsg>
 template <class SendMsg>
 void TLS<RecvMsg>::sendRoundRobin(const SendMsg& payload, const addresses& dests) {
     while (true) {
+        roundRobinIndex += 1;
         if (roundRobinIndex >= dests.size())
             roundRobinIndex = 0;
         // send to address if the connection exists
@@ -250,10 +276,10 @@ void TLS<RecvMsg>::sendRoundRobin(const SendMsg& payload, const addresses& dests
                 send<SendMsg>(payload, addr);
                 return;
             }
-            catch (const std::exception& e) {} // If it's an actual connection failure, the recv will eventually fail
+            catch (const std::exception& e) {
+                std::cout << "Failed to send round robin to addr: " << addr << std::endl;
+            } // If it's an actual connection failure, the recv will eventually fail
         }
-        // Otherwise, try with the next address
-        roundRobinIndex += 1;
     }
 }
 
@@ -314,11 +340,16 @@ void TLS<RecvMsg>::send(const SendMsg& payload, const std::string& addr) {
 }
 
 template <class RecvMsg>
-RecvMsg TLS<RecvMsg>::recv(const int sock, SSL* src) {
+std::optional<RecvMsg> TLS<RecvMsg>::recv(const int sock, SSL* src) {
     int readLen;
     int dataSize;
-    // 1. Read the size of the data
-    blockingRead(sock, src, (char*)&dataSize, sizeof(dataSize));
+    // 1. Read the size of the data (non-blocking, because sometimes there is nothing to read)
+    // std::cout << "Begin reading size" << std::endl;
+    int rc = SSL_read(src, &dataSize, sizeof(dataSize));
+    int err = SSL_get_error(src, rc);
+    if (err == SSL_ERROR_WANT_READ) // Nothing to read
+        return std::nullopt;
+    // std::cout << "Read size: " << dataSize << std::endl;
     // 2. Read the data.
     // Check whether we can use the existing buffer to read
     bool needNewBuffer = dataSize > READ_BUFFER_SIZE;
@@ -331,7 +362,9 @@ RecvMsg TLS<RecvMsg>::recv(const int sock, SSL* src) {
     else
         actualBuffer = readBuffer;
     // Keep reading until everything has been received.
+    // std::cout << "Begin reading packet of size: " << dataSize << std::endl;
     blockingRead(sock, src, actualBuffer.data(), dataSize);
+    // std::cout << "Read packet" << std::endl;
     
     zpp::bits::in in(actualBuffer);
     RecvMsg recvPayload;
@@ -364,6 +397,7 @@ template <class RecvMsg>
 void TLS<RecvMsg>::blockingRead(const int sock, SSL* ssl, char* buffer, const int bytes) {
     int readSoFar = 0;
     while (readSoFar < bytes) {
+        // std::cout << "Attempting blocking read for " << bytes << " bytes, readSoFar: " << readSoFar << std::endl;
         int readLen = SSL_read(ssl, buffer + readSoFar, bytes - readSoFar);
         if (readLen <= 0) {
             // block and retry
@@ -379,16 +413,21 @@ void TLS<RecvMsg>::blockingRead(const int sock, SSL* ssl, char* buffer, const in
 template <class RecvMsg>
 bool TLS<RecvMsg>::blockOnErr(const int sock, SSL* ssl, const int rc) {
     int err = SSL_get_error(ssl, rc);
+    // std::cout << "SSL error: " << err << std::endl;
     if (err == SSL_ERROR_NONE)
         return true;
     else if (err == SSL_ERROR_WANT_READ) {
         pollfd fds[1] {pollfd{sock, POLLIN, 0}};
+        // std::cout << "SSL blocking on WANT_READ" << std::endl;
         poll(fds, 1, -1);
+        // std::cout << "SSL WANT_READ unblocked" << std::endl;
         return true;
     }
     else if (err == SSL_ERROR_WANT_WRITE) {
         pollfd fds[1] {pollfd{sock, POLLOUT, 0}};
+        // std::cout << "SSL blocking on WANT_WRITE" << std::endl;
         poll(fds, 1, -1);
+        // std::cout << "SSL WANT_WRITE unblocked" << std::endl;
         return true;
     }
     else {

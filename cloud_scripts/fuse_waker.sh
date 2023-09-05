@@ -11,7 +11,7 @@ fi
 
 while getopts 'n:t:' flag; do
   case ${flag} in
-    s) NAME=${OPTARG} ;;
+    n) NAME=${OPTARG} ;;
     t) TRUSTED_MODE=${OPTARG} ;;
     *) print_usage
        exit 1;;
@@ -19,14 +19,14 @@ while getopts 'n:t:' flag; do
 done
 
 if [ $TRUSTED_MODE == "local" ]; then
-    BUILD_DIR=~/disk-tees/build/$SRC_NAME
+    BUILD_DIR=~/disk-tees/build/$NAME
 else
-    BUILD_DIR=/home/azureuser/disk-tees/build/$SRC_NAME
+    BUILD_DIR=/home/azureuser/disk-tees/build/$NAME
 fi
 SRC_DIR=$BUILD_DIR/shim
 
 while true; do
+    sleep 5
     ls $SRC_DIR
     echo "Woke FUSE, sleeping..."
-    sleep 5
 done

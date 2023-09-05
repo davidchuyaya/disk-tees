@@ -89,9 +89,9 @@ then
   
   # 1. Create nodes for CCF (unnecessary)
   # 2. Launch CCF in the background
-  # /opt/ccf_virtual/bin/sandbox.sh --verbose \
-  #   --package /opt/ccf_virtual/lib/libjs_generic \
-  #   --js-app-bundle $PROJECT_DIR/ccf > $BUILD_DIR/ccf.log 2>&1 &
+  /opt/ccf_virtual/bin/sandbox.sh --verbose \
+    --package /opt/ccf_virtual/lib/libjs_generic \
+    --js-app-bundle $PROJECT_DIR/ccf > $BUILD_DIR/ccf.log 2>&1 &
   
   # Create CCF JSON. Note that IP include port, since it'll be used by CURL that way.
   CCF_JSON=$BUILD_DIR/ccf.json
@@ -121,10 +121,10 @@ then
     # Attach variables
     $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
     $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v $i
-    $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n WAIT_SECS -v $WAIT_SECS
     $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
     # Run replica in background
-    # $NEW_INIT_SCRIPT > $REPLICA_DIR/log.txt 2>&1 &
+    $NEW_INIT_SCRIPT > $REPLICA_DIR/log.txt 2>&1 &
+    sleep 1 # Prevent 2 replicas from trying to overwrite the same executable through cmake
   done
 
   # Create replica JSON
@@ -153,9 +153,10 @@ then
   # Attach variables
   $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
   $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v 0
+  $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n WAIT_SECS -v $WAIT_SECS
   $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
   # Run client
-  # $NEW_INIT_SCRIPT
+  $NEW_INIT_SCRIPT
 
   exit 0
 fi

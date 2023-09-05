@@ -254,9 +254,9 @@ enum ClientMsgType {
 };
 
 inline ClientMsgType getClientMsgType(const clientMsg& msg) {
-    if (msg.index() < 18)
+    if (msg.index() < 19)
         return Write;
-    else if (msg.index() == 18)
+    else if (msg.index() == 19)
         return Fsync;
     else
         return Protocol;

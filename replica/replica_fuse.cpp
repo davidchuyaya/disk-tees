@@ -224,6 +224,7 @@ void ReplicaFuse::operator()(const copyFileRangeParams &params) {
 }
 
 void ReplicaFuse::operator()(const p1a& msg) {
+    std::cout << "Received p1a" << std::endl;
     // Set the highest ballot if the client's is higher
     if (highestBallot < msg.r)
         highestBallot = msg.r;
@@ -247,33 +248,32 @@ void ReplicaFuse::operator()(const p1a& msg) {
     replicas = NetworkConfig::configToAddrs(Replica, netConfWithoutSelf);
 
     // 2. Find the set of new replicas to connect to
-    networkConfig newConnections = {};
+    newConnections = {};
     for (auto& [peerId, addr] : netConfWithoutSelf) {
         if (!replicasNetConf.contains(peerId)) {
             newConnections[peerId] = addr;
         }
     }
+    replicasNetConf = netConfWithoutSelf;
 
     // 3. Ask CCF for the new replicas' certificates
     CCFNetwork ccfNetwork(path, ccf);
     for (auto& [peerId, addr] : newConnections) {
         ccfNetwork.getCert(peerId, "replica" + std::to_string(peerId), "replica");
-    }
+    }    
 
-    // 4. Connect to the new replicas
-    clientTLS->newNetwork(newConnections);
-
-    // 5. Don't send messages to the old client anymore
+    // 4. Don't send messages to the old client anymore
     client = sender;
 }
 
 void ReplicaFuse::operator()(const diskReq& msg) {
+    std::cout << "Received diskReq" << std::endl;
     if (msg.r < highestBallot)
         return;
     
     // Send the disk
     std::ostringstream ss;
-    ss << path << "../../cloud_scripts/send_disk.sh";
+    ss << path << "/../../cloud_scripts/send_disk.sh";
     ss << " -s " << name;
     ss << " -d client" << msg.id;
     ss << " -a " << sender << ":" << NetworkConfig::getPort(Client, msg.id);
@@ -306,6 +306,7 @@ void ReplicaFuse::operator()(const diskReq& msg) {
 }
 
 void ReplicaFuse::operator()(const p2a& msg) {
+    std::cout << "Received p2a" << std::endl;
     if (msg.r < highestBallot)
         return;
 
@@ -316,7 +317,7 @@ void ReplicaFuse::operator()(const p2a& msg) {
     // Unzip the disk if necessary
     if (!msg.diskChecksum.empty()) {
         std::ostringstream ss;
-        ss << path << "../../cloud_scripts/unzip_disk.sh";
+        ss << path << "/../../cloud_scripts/unzip_disk.sh";
         ss << " -s " << msg.diskReplicaName;
         ss << " -d " << name;
         ss << " -t " << trustedMode;
@@ -341,6 +342,9 @@ void ReplicaFuse::operator()(const p2a& msg) {
     fsyncRecvTime = {};
     fileHandleConverter = {};
 
+    // Connect to the new replicas
+    clientTLS->newNetwork(newConnections);
+
     // Reply to client
     clientTLS->send<replicaMsg>(p2b {
         .id = id,
@@ -356,6 +360,8 @@ void ReplicaFuse::operator()(const p2a& msg) {
 void ReplicaFuse::bufferMsg(const clientMsg& msg, const std::string& addr) {
     sender = addr;
 
+    // std::cout << "Received message: " << getSeq(msg) << ", written: " << written << ", type: " << getClientMsgType(msg) << " from " << sender << ", is client: " << (sender == client) << std::endl;
+
     if (getBallot(msg) < highestBallot) {
         std::cout << "Received message with ballot " << getBallot(msg) << " when highestBallot is " << highestBallot << std::endl;
         return;
@@ -365,16 +371,22 @@ void ReplicaFuse::bufferMsg(const clientMsg& msg, const std::string& addr) {
     switch (getClientMsgType(msg)) {
         case Write:
             // Broadcast to other replicas
-            if (sender != client)
-                clientTLS->broadcast<clientMsg>(msg, replicas);
+            if (sender == client) {
+                // std::cout << "Broadcasting message to replicas" << std::endl;
+                clientTLS->broadcastExcept<clientMsg>(msg, client);
+                // std::cout << "Completed broadcast to replicas" << std::endl;
+            }
             // Don't buffer if message can be immediately processed
             seq = getSeq(msg);
             if (seq == written + 1 && ballotIsValid(getBallot(msg))) {
                 std::visit(*this, msg);
                 written += 1;
             }   
-            else
+            else if (seq > written) {
+                // std::cout << "Buffered write: " << seq << ", written: " << written << std::endl;
                 pendingWrites[seq] = msg;
+            }
+                
             break;
         case Fsync:
             // Don't buffer if message can be immediately processed
@@ -382,6 +394,7 @@ void ReplicaFuse::bufferMsg(const clientMsg& msg, const std::string& addr) {
             if (seq <= written && ballotIsValid(getBallot(msg)))
                 std::visit(*this, msg);
             else {
+                // std::cout << "Buffered fsync: " << seq << ", written: " << written << std::endl;
                 lastFsync = std::get<fsyncParams>(msg);
                 fsyncRecvTime = now();
             }
@@ -395,23 +408,26 @@ void ReplicaFuse::bufferMsg(const clientMsg& msg, const std::string& addr) {
 
 void ReplicaFuse::processPendingMessages() {
     // Process messages until we can't process any more
-    bool processedMsg = false;
-    do {
+    while (true) {
         int nextWrite = written + 1;
         if (pendingWrites.contains(nextWrite)) {
             clientMsg& msg = pendingWrites[nextWrite];
             if (ballotIsValid(getBallot(msg))) {
+                // std::cout << "Processed message with written: " << written << std::endl;
                 std::visit(*this, msg);
-                processedMsg = true;
                 written += 1;
                 pendingWrites.erase(nextWrite);
-            }       
+                continue;
+            }
         }
-    } while (processedMsg);
+        break;
+    } 
 
     // Send fsync ack if possible
+    // std::cout << "Attempting to process fsyncs, written: " << written << std::endl;
     if (lastFsync.seq <= written && lastFsync.seq > lastAckedWrite && ballotIsValid(lastFsync.r)) {
         (*this)(lastFsync);
+        // std::cout << "Processed fsync, written: " << written << std::endl;
         lastAckedWrite = written;
     }
 }

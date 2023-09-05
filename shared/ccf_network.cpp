@@ -27,7 +27,7 @@ void CCFNetwork::getCert(const int id, const std::string& name, const std::strin
         // construct bash command
         const std::string& address = liveAddresses.back();
         std::ostringstream ss;
-        ss << path << "../../cloud_scripts/ccf_networking/get_cert_no_retry.sh";
+        ss << path << "/../../cloud_scripts/ccf_networking/get_cert_no_retry.sh";
         ss << " -a " << address;
         ss << " -i " << id;
         ss << " -n " << name;
@@ -54,14 +54,14 @@ matchB CCFNetwork::sendMatchA(const ballot r, const networkConfig config) {
         // construct bash command
         const std::string& address = liveAddresses.back();
         std::ostringstream ss;
-        ss << path << "../../cloud_scripts/ccf_networking/send_json.sh";
+        ss << path << "/../../cloud_scripts/ccf_networking/send_json.sh";
         ss << " -a " << address;
         ss << " -e match";
-        ss << " -s "<< sendData.dump();
+        ss << " -j " << "'" << sendData.dump() << "'";
         std::cout << "Executing command: " << ss.str() << std::endl;
         int errorCode = system(ss.str().c_str());
 
-        if (curlSuccessful(errorCode) && requestSuccessful(GET_CERT_OUTPUT_FILE))
+        if (curlSuccessful(errorCode) && requestSuccessful(MATCH_OUTPUT_FILE))
             break;
     }
 
@@ -101,17 +101,17 @@ void CCFNetwork::sendGarbageA(const ballot r) {
         // construct bash command
         const std::string& address = liveAddresses.back();
         std::ostringstream ss;
-        ss << path << "../../cloud_scripts/ccf_networking/send_json.sh";
+        ss << path << "/../../cloud_scripts/ccf_networking/send_json.sh";
         ss << " -a " << address;
         ss << " -e garbage";
-        ss << " -s "<< sendData.dump();
+        ss << " -j " << "'" << sendData.dump() << "'";
         std::cout << "Executing command: " << ss.str() << std::endl;
         int errorCode = system(ss.str().c_str());
 
-        if (curlSuccessful(errorCode) && requestSuccessful(GET_CERT_OUTPUT_FILE))
+        if (curlSuccessful(errorCode) && requestSuccessful(GARBAGE_OUTPUT_FILE))
             break;
-    } 
-    removeOutputFile(MATCH_OUTPUT_FILE);
+    }
+    removeOutputFile(GARBAGE_OUTPUT_FILE);
 }
 
 std::string CCFNetwork::ballotToString(const ballot& r) {

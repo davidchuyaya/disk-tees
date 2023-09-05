@@ -51,6 +51,7 @@ private:
     std::string client; // the client with the highest ballot (reset in p1a)
     addresses replicas; // the replicas in the latest config (reset in p1a)
     networkConfig replicasNetConf;
+    networkConfig newConnections; // set in p1a, connect to in p2a (so each replica has time to download certificates)
     int written = -1;
     ballot highestBallot = {0,0,0};
     ballot normalBallot = {0,0,0};

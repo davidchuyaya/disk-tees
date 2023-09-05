@@ -22,4 +22,4 @@ while getopts 'a:e:j:' flag; do
 done
 
 # -m 60 = Time out after 60 seconds
-curl https://${ADDRESS}/matchmaker/${ENDPOINT} -X POST --cacert service_cert.pem --cert user0_cert.pem --key user0_privk.pem -m 60 -H "Content-Type: application/json" --data-binary '"$JSON"' > ${ENDPOINT}.json
+curl https://${ADDRESS}/matchmaker/${ENDPOINT} -X POST --cacert service_cert.pem --cert user0_cert.pem --key user0_privk.pem -m 60 -H "Content-Type: application/json" --data-binary "$JSON" > ${ENDPOINT}.json

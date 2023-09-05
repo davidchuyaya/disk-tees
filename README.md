@@ -25,13 +25,36 @@ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
 Execute the following:
 ```bash
-./launch.sh -t <trusted_mode> -p <postgres_mode>
+./launch.sh -t <trusted_mode> -p <postgres_mode> -w <wait time> -m <tmpfs memory>
 ```
 Documentation for each mode can be found by executing `./launch.sh`. Note that the script will not work if you are not under the "Azure Research Subs" subscription in Azure. Be sure to modify the script to use your own subscription.
 
-To run locally, use `local` as the trusted mode. Files will be created under the `build` directory.
+To run locally, use `local` as the trusted mode. Files will be created under the `build` directory. Here are some ways I used `launch.sh` for local testing. Pick one to run:
+```bash
+./launch.sh -t local -p normal
+./launch.sh -t local -p fuse
+./launch.sh -t local -p tmpfs -m 2
+./launch.sh -t local -p rollbaccine -w 10 -m 2
+```
+
+Note that sudo access will be required to mount tmpfs.
+
+Once startup is complete (when the script terminates), you can run TPC-C against postgres with `./benchbase_run.sh`.
+TODO: Automate benchmarking.
+Results from running the benchmark can be found in `benchbase/target/benchbase-postgres/results`.
+
+If something goes wrong during the run and you'd like to debug the scripts, the files that each executable uses can be found under `build/<executable name>`, such as `build/client0` for the client, `build/replica0` for the first replica, etc.
+The log of each executable can be found in `log.txt` within that directory.
+The certificates for CCF can be found in `build/workspace/sandbox_common`, and its log can be read from `build/workspace/sandbox_0/out`.
 
 ### Cleaning up locally
+
+Execute the following:
+```bash
+./cleanup.sh
+```
+
+Note that sudo access will be required to unmount tmpfs.
 
 ### Cleaning up Azure
 TODO

@@ -27,7 +27,7 @@ const keyConfigs = "public:configs";
 const keyBallot = "public:ballot";
 const keyBallotHighest = "highestBallot";
 
-function get_cert_table_from_type(query) {
+function get_cert_table_from_type(parsedQuery) {
   if (parsedQuery.type === undefined) {
     throw new Error("Could not find 'type' in query");
   }
@@ -145,6 +145,7 @@ export function on_match_a(request) {
   // if the client's ballot is higher
   if (ballot_less_than(highestBallot, ballot)) {
     set_ballot_to_ccf(ballot);
+    
     ccf.kv[keyConfigs].set(ballot_to_buf(ballot), ccf.strToBuf(JSON.stringify(parsedQuery.config)));
     
     // return all previous configs
