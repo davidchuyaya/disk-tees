@@ -32,7 +32,7 @@ Documentation for each mode can be found by executing `./launch.sh`. Note that t
 To run locally, use `local` as the trusted mode. Files will be created under the `build` directory. Here are some ways I used `launch.sh` for local testing. Pick one to run:
 ```bash
 ./launch.sh -t local -p normal
-./launch.sh -t local -p fuse
+./launch.sh -t local -p fuse -m 2
 ./launch.sh -t local -p tmpfs -m 2
 ./launch.sh -t local -p rollbaccine -w 10 -m 2
 ```
