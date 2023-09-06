@@ -28,6 +28,7 @@ CCF_ADDR=$(jq -r '.[0].ip' ${BUILD_DIR}/ccf.json)
 $HOME_DIR/disk-tees/cloud_scripts/ccf_networking/add_cert.sh -a $CCF_ADDR -i $ID -n $NAME -t "replica"
 # Download the client's certificate. Assume that the client's ID is 0.
 $HOME_DIR/disk-tees/cloud_scripts/ccf_networking/get_cert.sh -a $CCF_ADDR -i 0 -n "client0" -t "client"
+# TODO: Create script to constantly check for new client certificates in the background
 
 # Mount tmpfs for mirroring client writes
 DIR=$BUILD_DIR/storage

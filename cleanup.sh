@@ -1,4 +1,12 @@
 #!/bin/bash
+while getopts 'r' flag; do
+  case ${flag} in
+    r) CLEANUP_REMOTE=true ;;
+    *) print_usage
+       exit 1;;
+  esac
+done
+
 echo "Cleaning up, most error messages should be ignored..."
 echo "If a directory fails to unmount because it is busy, manually kill the process that is using it, then unmount it."
 echo "May need to rerun twice."
@@ -41,6 +49,26 @@ shopt -s extglob
 rm -rf ~/disk-tees/build/client0
 rm -rf ~/disk-tees/build/replica+([0-9])
 rm -rf ~/disk-tees/build/workspace
+rm -rf ~/disk-tees/build/benchbase
 rm -f ~/disk-tees/build/ccf.json
 rm -f ~/disk-tees/build/replicas.json
+rm -f ~/disk-tees/build/vms.json
 rm -f ~/disk-tees/build/ccf.log
+
+# Delete resource groups
+if [ $CLEANUP_REMOTE = true ]
+then
+    echo "Deleting all possible resource groups, expect an error for those that do not exist..."
+    TRUSTED_MODES=("trusted" "untrusted")
+    POSTGRES_MODES=("normal" "tmpfs" "fuse" "rollbaccine")
+    for TRUSTED_MODE in "${TRUSTED_MODES[@]}"
+    do
+        for POSTGRES_MODE in "${POSTGRES_MODES[@]}"
+        do
+            RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${POSTGRES_MODE}
+            az group delete \
+                --name $RESOURCE_GROUP \
+                --yes --no-wait
+        done
+    done
+fi

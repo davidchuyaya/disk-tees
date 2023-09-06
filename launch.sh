@@ -29,10 +29,11 @@ while getopts 't:p:w:m:' flag; do
   esac
 done
 
-# Validate options and set variables
+# Set variables
 SUBSCRIPTION="d8583813-7f3b-43a6-85ac-bac7e4751e5a" # Azure subscription internal to Microsoft Research. Change this to your own subscription.
 RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${POSTGRES_MODE}
 NUM_REPLICAS=3
+NUM_CCF_NODES=3
 
 # Before changing LOCATION, ZONE, or VM_SIZE, make sure the new location has VMs of that size available.
 case $TRUSTED_MODE in
@@ -176,42 +177,27 @@ az ppg create \
   --location $LOCATION \
   --intent-vm-sizes $VM_SIZE
 
-# Arguments: $1 = "client", "replica", or "benchbase"
-create_vms() {
-  case $1 in
-    "client")
-      INIT_SCRIPT=$CLIENT_INIT_SCRIPT;;
-    "replica")
-      REPLICA_COUNT="--count $NUM_REPLICAS"
-      INIT_SCRIPT=$REPLICA_INIT_SCRIPT;;
-    "benchbase")
-      INIT_SCRIPT=$BENCHBASE_INIT_SCRIPT;;
-    *) 
-      echo "Invalid VM type in create_vms() of launch.sh."
-      exit 1;;
-  esac
+case $POSTGRES_MODE in
+  "rollbaccine")
+    NUM_VMS=$(($NUM_REPLICAS + $NUM_CCF_NODES + 2));;
+  *) # 2 = client + benchbase
+    NUM_VMS=2;;
+esac
 
-  az vm create \
-    --resource-group $RESOURCE_GROUP \
-    --name ${RESOURCE_GROUP}_$1 \
-    --admin-username azureuser \
-    --generate-ssh-keys \
-    --public-ip-sku Standard \
-    --nic-delete-option Delete \
-    --os-disk-delete-option Delete \
-    --custom-data $INIT_SCRIPT \
-    --accelerated-networking \
-    --ppg ${RESOURCE_GROUP}_ppg \
-    --location $LOCATION \
-    --zone $ZONE \
-    --size $VM_SIZE \
-    --image $IMAGE $REPLICA_COUNT $TRUSTED_PARAMS
-}
-
-# Create VMs
-create_vms "client"
-create_vms "benchbase"
-if [ $POSTGRES_MODE == "rollbaccine" ]
-then
-  create_vms "replica"
-fi
+az vm create \
+  --resource-group $RESOURCE_GROUP \
+  --name $POSTGRES_MODE \
+  --count $NUM_VMS \
+  --admin-username azureuser \
+  --generate-ssh-keys \
+  --public-ip-sku Standard \
+  --nic-delete-option Delete \
+  --os-disk-delete-option Delete \
+  --data-disk-delete-option Delete \
+  --accelerated-networking \
+  --ppg ${RESOURCE_GROUP}_ppg \
+  --location $LOCATION \
+  --zone $ZONE \
+  --size $VM_SIZE \
+  --data-disk-sizes-gb 32 \
+  --image $IMAGE $TRUSTED_PARAMS

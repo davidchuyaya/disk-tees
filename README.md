@@ -9,10 +9,6 @@ Execute the following commands to install the necessary packages to compile this
 ./install.sh
 cmake .
 make
-```
-
-(Test local) Execute the following commands to run the benchmarks locally:
-```bash
 ./local_install.sh
 ```
 
@@ -40,30 +36,30 @@ To run locally, use `local` as the trusted mode. Files will be created under the
 Note that sudo access will be required to mount tmpfs.
 
 Once startup is complete (when the script terminates), you can run TPC-C against postgres with `./benchbase_run.sh`.
-TODO: Automate benchmarking.
-Results from running the benchmark can be found in `benchbase/target/benchbase-postgres/results`.
+Results from running the benchmark can be found in `~/benchbase/target/benchbase-postgres/results`.
 
 If something goes wrong during the run and you'd like to debug the scripts, the files that each executable uses can be found under `build/<executable name>`, such as `build/client0` for the client, `build/replica0` for the first replica, etc.
 The log of each executable can be found in `log.txt` within that directory.
 The certificates for CCF can be found in `build/workspace/sandbox_common`, and its log can be read from `build/workspace/sandbox_0/out`.
 
-### Cleaning up locally
+### Running on Azure
 
-Execute the following:
+Launch the VMs with `./launch.sh` in the section above, with `-t untrusted` or `-t trusted` based on whether you want regular or confidential VMs.
+
+
+### Cleaning up
+
+Execute the following, adding the `-r` option if running on Azure:
 ```bash
 ./cleanup.sh
 ```
 
 Note that sudo access will be required to unmount tmpfs.
 
-### Cleaning up Azure
-TODO
-
-
 
 ## Developing locally
 
-This section is for testing modifications to the code without using `./launch.sh`, which is the recommended (but heavier) approach.
+This section is for testing modifications to the code without using `./launch.sh`.
 
 TODO: Figure of how writes enter through the mountpoint, are sent to the replicas, and then are written to the redirect point and the replica's directory.
 

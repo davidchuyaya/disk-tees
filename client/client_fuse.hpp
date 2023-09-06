@@ -24,6 +24,7 @@ public:
     void operator()(const p2b& msg); 
     void operator()(const fsyncMissing& msg);
     void operator()(const fsyncAck& msg);
+    // TODO: Open port for user, listen for reconfiguration messages
 
     // FUSE functions
     static void *client_init(fuse_conn_info *conn, fuse_config *cfg);

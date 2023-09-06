@@ -20,6 +20,8 @@ while getopts 'i:t:' flag; do
   esac
 done
 
+NUM_RUNS=3
+
 if [ $TRUSTED_MODE == "local" ]; then
     cd ~
 else
@@ -29,5 +31,8 @@ fi
 cd benchbase/target/benchbase-postgres
 # Modify IP address in config
 sed -i "s/localhost/$CLIENT_IP/g" config/postgres/sample_tpcc_config.xml
-java -jar benchbase.jar -b tpcc -c config/postgres/sample_tpcc_config.xml --create=true --load=true --execute=true
-# TODO: Collect results
+for i in $(seq 1 $NUM_RUNS)
+do
+    echo "Run $i of $NUM_RUNS"
+    java -jar benchbase.jar -b tpcc -c config/postgres/sample_tpcc_config.xml --create=true --load=true --execute=true
+done

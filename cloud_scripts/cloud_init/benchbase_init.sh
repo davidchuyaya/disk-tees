@@ -2,12 +2,9 @@
 # 
 # Install and run benchbase.
 #
-# Assumes thae following files will be inserted via attach_file.sh:
-#   ccf.json
 # Assumes the following variables will be inserted via attach_var.sh:
 #   TRUSTED_MODE: "local", "trusted", or "untrusted"
-#   ID: client ID
-#   CLIENT_IP: IP address of client
+#   CLIENT_IP: private IP of the client
 
 if [ $TRUSTED_MODE == "local" ]; then
     HOME_DIR=~
@@ -18,7 +15,6 @@ else
 fi
 
 cd ${HOME_DIR}/disk-tees
-./install.sh
 cloud_scripts/db_benchmark/benchbase_install.sh -t $TRUSTED_MODE
-cd /home/azureuser/disk-tees
+cd ${HOME_DIR}/disk-tees
 cloud_scripts/db_benchmark/benchbase_run.sh -i $CLIENT_IP -t $TRUSTED_MODE
