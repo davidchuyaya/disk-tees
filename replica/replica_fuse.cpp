@@ -320,7 +320,6 @@ void ReplicaFuse::operator()(const p2a& msg) {
         ss << path << "/../../cloud_scripts/unzip_disk.sh";
         ss << " -s " << msg.diskReplicaName;
         ss << " -d " << name;
-        ss << " -t " << trustedMode;
         ss << " -c " << msg.diskChecksum;
         std::cout << "Executing command: " << ss.str() << std::endl;
         int errorCode = system(ss.str().c_str());

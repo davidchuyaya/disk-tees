@@ -34,6 +34,7 @@ done
 RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${POSTGRES_MODE}
 NUM_REPLICAS=3
 NUM_CCF_NODES=3
+CCF_START_PORT=10200
 
 echo "Fetching VM IP addresses, if necessary, assuming launch.sh has been run..."
 VMS_JSON=build/vms.json
@@ -47,7 +48,7 @@ echo "Creating JSONs for CCF and replicas, if necessary. The 1st VM will always 
 CCF_JSON=build/ccf.json
 REPLICAS_JSON=build/replicas.json
 readarray -t PRIVATE_IPS < <(jq -r -c '.[].privateIps' $VMS_JSON)
-if [ ! -f $CCF_JSON ] && [ ! -f $REPLICAS_JSON ]
+if [ ! -f $CCF_JSON ] || [ ! -f $REPLICAS_JSON ]
 then
     echo '[' > $CCF_JSON
     echo '[' > $REPLICAS_JSON
@@ -56,7 +57,8 @@ then
         if (( $i >= 2 )) && (( $i < 2 + $NUM_CCF_NODES ))
         then
             ID=$(($i - 2))
-            echo '{"ip": "'${PRIVATE_IPS[$i]}'", "id": '$ID'}' >> $CCF_JSON
+            PORT=$(($CCF_START_PORT + $ID))
+            echo '{"ip": "'${PRIVATE_IPS[$i]}:$PORT'", "id": '$ID'}' >> $CCF_JSON
         elif (( $i >= 2 + $NUM_CCF_NODES ))
         then
             ID=$(($i - 2 - $NUM_CCF_NODES))
@@ -77,11 +79,12 @@ fi
 
 echo "Running $NODE_TYPE..."
 # Note: Most of the code below matches "local" mode in launch.sh
-CLIENT_INIT_SCRIPT=~/disk-tees/cloud_scripts/cloud_init/client_init_${POSTGRES_MODE}.sh
-BENCHBASE_INIT_SCRIPT=~/disk-tees/cloud_scripts/cloud_init/benchbase_init.sh
-REPLICA_INIT_SCRIPT=~/disk-tees/cloud_scripts/cloud_init/replica_init.sh
+USERNAME=$(whoami)
+PROJECT_DIR=/home/$USERNAME/disk-tees
+CLIENT_INIT_SCRIPT=$PROJECT_DIR/cloud_scripts/cloud_init/client_init_${POSTGRES_MODE}.sh
+BENCHBASE_INIT_SCRIPT=$PROJECT_DIR/cloud_scripts/cloud_init/benchbase_init.sh
+REPLICA_INIT_SCRIPT=$PROJECT_DIR/cloud_scripts/cloud_init/replica_init.sh
 
-PROJECT_DIR=~/disk-tees
 BUILD_DIR=$PROJECT_DIR/build
 CERT_DIR=$BUILD_DIR/workspace/sandbox_common
 SERVICE_CERT=$CERT_DIR/service_cert.pem
@@ -109,8 +112,7 @@ case $NODE_TYPE in
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v 0
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n WAIT_SECS -v $WAIT_SECS
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
-        # Prevent SSH from reading this script and jumping to the default case. See: https://unix.stackexchange.com/a/107802/386668
-        ssh -n -o StrictHostKeyChecking=no azureuser@${PUBLIC_IPS[0]} $NEW_INIT_SCRIPT
+        ssh -o StrictHostKeyChecking=no $USERNAME@${PUBLIC_IPS[0]} "bash -s" -- < $NEW_INIT_SCRIPT
         ;;
     "benchbase")
         BENCHBASE_DIR=$BUILD_DIR/benchbase
@@ -118,30 +120,27 @@ case $NODE_TYPE in
         NEW_INIT_SCRIPT=$BENCHBASE_DIR/benchbase_init.sh
         cp $BENCHBASE_INIT_SCRIPT $NEW_INIT_SCRIPT
         # Attach variables
-        $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n CLIENT_IP -v ${PRIVATE_IPS[0]}
-        ssh -n -o StrictHostKeyChecking=no azureuser@${PUBLIC_IPS[1]} $NEW_INIT_SCRIPT
+        ssh -o StrictHostKeyChecking=no $USERNAME@${PUBLIC_IPS[1]} "bash -s" -- < $NEW_INIT_SCRIPT
         # Download results
         echo "Downloading results to $BENCHBASE_DIR/results..."
-        scp -r azureuser@${PUBLIC_IPS[1]}:/home/azureuser/benchbase/target/benchbase-postgres/results $BENCHBASE_DIR
+        scp -r $USERNAME@${PUBLIC_IPS[1]}:/home/$USERNAME/benchbase/target/benchbase-postgres/results $BENCHBASE_DIR
         ;;
     "ccf")
-        CCF_START_PORT=10200
         CCF_ADDRS=""
         for i in "${!PUBLIC_IPS[@]}"
         do
             if (( $i >= 2 )) && (( $i < 2 + $NUM_CCF_NODES ))
             then
                 PORT=$(($CCF_START_PORT + $i - 2))
-                CCF_ADDRS+=${PUBLIC_IPS[$i]}:$PORT,
+                CCF_ADDRS+="--node ssh://"${PUBLIC_IPS[$i]}:$PORT" "
             fi
         done
         echo "CCF_ADDRS: $CCF_ADDRS"
         cd $BUILD_DIR
         /opt/ccf_virtual/bin/sandbox.sh --verbose \
             --package /opt/ccf_virtual/lib/libjs_generic \
-            --js-app-bundle ~/disk-tees/ccf \
-            --node ssh://$CCF_ADDRS # List of (local://|ssh://)hostname:port[,pub_hostnames:pub_port]
+            --js-app-bundle ~/disk-tees/ccf $CCF_ADDRS # List of (local://|ssh://)hostname:port[,pub_hostnames:pub_port]
         ;;
     "replicas")
         REPLICA_DIR=$BUILD_DIR/replica$i
@@ -161,7 +160,7 @@ case $NODE_TYPE in
             if (($i >= 2 + $NUM_CCF_NODES))
             then
                 # Don't stay connected to SSH, so we can launch multiple. See: https://unix.stackexchange.com/a/412586/386668
-                ssh -n -o StrictHostKeyChecking=no azureuser@${PUBLIC_IPS[$i]} screen -d -m $NEW_INIT_SCRIPT
+                ssh -o StrictHostKeyChecking=no $USERNAME@${PUBLIC_IPS[$i]} screen -d -m "bash -s" -- < $NEW_INIT_SCRIPT
             fi
         done
         ;;

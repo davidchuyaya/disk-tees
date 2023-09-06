@@ -9,25 +9,24 @@
 #   ID: replica ID
 #   TMPFS_MEMORY: how much memory to allocate to tmpfs (in Gb)
 
-if [ $TRUSTED_MODE == "local" ]; then
-    HOME_DIR=~
-    # Assume that disk-tees has been cloned if this is executing locally
-else
-    HOME_DIR=/home/azureuser
+USERNAME=$(whoami)
+PROJECT_DIR=/home/$USERNAME/disk-tees
+if [ ! -d $PROJECT_DIR ]; then
+    cd /home/$USERNAME
     git clone https://github.com/davidchuyaya/disk-tees.git
 fi
 
 NAME=replica${ID}
-BUILD_DIR=$HOME_DIR/disk-tees/build/$NAME
+BUILD_DIR=$PROJECT_DIR/build/$NAME
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 
 # Create certificates and send them to CCF
-$HOME_DIR/disk-tees/cloud_scripts/create_cert.sh -t $TRUSTED_MODE -n $NAME
+$PROJECT_DIR/cloud_scripts/create_cert.sh -t $TRUSTED_MODE -n $NAME
 CCF_ADDR=$(jq -r '.[0].ip' ${BUILD_DIR}/ccf.json)
-$HOME_DIR/disk-tees/cloud_scripts/ccf_networking/add_cert.sh -a $CCF_ADDR -i $ID -n $NAME -t "replica"
+$PROJECT_DIR/cloud_scripts/ccf_networking/add_cert.sh -a $CCF_ADDR -i $ID -n $NAME -t "replica"
 # Download the client's certificate. Assume that the client's ID is 0.
-$HOME_DIR/disk-tees/cloud_scripts/ccf_networking/get_cert.sh -a $CCF_ADDR -i 0 -n "client0" -t "client"
+$PROJECT_DIR/cloud_scripts/ccf_networking/get_cert.sh -a $CCF_ADDR -i 0 -n "client0" -t "client"
 # TODO: Create script to constantly check for new client certificates in the background
 
 # Mount tmpfs for mirroring client writes
@@ -41,9 +40,8 @@ mkdir -p $ZIPPED_DIR
 sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $ZIPPED_DIR
 
 # Make disk-tees, mount it on $DIR
-cd $HOME_DIR/disk-tees
+cd $PROJECT_DIR
 cmake .
 make
 cd $BUILD_DIR
-# Run in background so startup script can terminate
-$HOME_DIR/disk-tees/replica/disk_tees -i $ID -t $TRUSTED_MODE &
+$PROJECT_DIR/replica/disk_tees -i $ID -t $TRUSTED_MODE

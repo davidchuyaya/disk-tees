@@ -21,11 +21,8 @@ while getopts 's:d:a:t:z' flag; do
   esac
 done
 
-if [ $TRUSTED_MODE == "local" ]; then
-    BUILD_DIR=~/disk-tees/build/$SRC_NAME
-else
-    BUILD_DIR=/home/azureuser/disk-tees/build/$SRC_NAME
-fi
+USERNAME=$(whoami)
+BUILD_DIR=/home/$USERNAME/disk-tees/build/$SRC_NAME
 SRC_DIR=$BUILD_DIR/storage
 OUTPUT_FILE=$BUILD_DIR/zipped-storage/$SRC_NAME.tar.gz
 
@@ -40,6 +37,6 @@ fi
 if [ $TRUSTED_MODE == "local" ]; then
     cp $OUTPUT_FILE ~/disk-tees/build/$DST_NAME/zipped-storage
 else
-    scp $OUTPUT_FILE azureuser@$ADDR:/home/azureuser/disk-tees/build/$DST_NAME/zipped-storage
+    scp $OUTPUT_FILE $USERNAME@$ADDR:/home/$USERNAME/disk-tees/build/$DST_NAME/zipped-storage
 fi
 # rm $OUTPUT_FILE

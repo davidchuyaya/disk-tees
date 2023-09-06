@@ -47,10 +47,10 @@ The certificates for CCF can be found in `build/workspace/sandbox_common`, and i
 Launch the VMs with `./launch.sh` in the section above, with `-t untrusted` or `-t trusted` based on whether you want regular or confidential VMs.
 Then, start the actual machines in the following order:
 ```bash
-./run -t <trusted_mode> -p <postgres_mode> -n ccf
-./run -t <trusted_mode> -p <postgres_mode> -n replicas -m <tmpfs memory>
-./run -t <trusted_mode> -p <postgres_mode> -n clients -w <wait time> -m <tmpfs memory>
-./run -t <trusted_mode> -p <postgres_mode> -n benchbase
+./run.sh -t <trusted_mode> -p <postgres_mode> -n ccf
+./run.sh -t <trusted_mode> -p <postgres_mode> -n replicas -m <tmpfs memory>
+./run.sh -t <trusted_mode> -p <postgres_mode> -n client -w <wait time> -m <tmpfs memory>
+./run.sh -t <trusted_mode> -p <postgres_mode> -n benchbase
 ```
 
 Only the client and benchbase need to be run if `<postgres_mode>` is not `rollbaccine`.
@@ -60,6 +60,8 @@ Here's what happens during startup and why the order is important:
 3. The client send its certificate to CCF, downloads the certificates of the replicas in its configuration, completes matchmaking with that configuration, then begins leader election with the replicas.
 4. Replicas receive the new configuration from the client, query CCF for the replicas' certificates, and connect to each other.
 5. Once the client has won leader election, writes can occur (from postgres, for example).
+
+In a real (secure) deployment, instead of launching the VMs first, then using SSH to run the scripts locally, we would include the scripts in the `--cloud-init` parameter for each of the VMs. The scripts `cloud_scripts/attach_file.sh` and `cloud_scripts/attach_var.sh` allow us to package files and arguments into a single cloud init script, so SSHing is not required, since giving a user SSH access would be insecure. This is not used in the experiments for ease of debuggability. Note that CVMs do not currently have a method of preventing SSH access, to my knowledge.
 
 ### Cleaning up
 

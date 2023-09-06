@@ -3,18 +3,16 @@
 # Install and run benchbase.
 #
 # Assumes the following variables will be inserted via attach_var.sh:
-#   TRUSTED_MODE: "local", "trusted", or "untrusted"
 #   CLIENT_IP: private IP of the client
 
-if [ $TRUSTED_MODE == "local" ]; then
-    HOME_DIR=~
-    # Assume that disk-tees has been cloned if this is executing locally
-else
-    HOME_DIR=/home/azureuser
+USERNAME=$(whoami)
+PROJECT_DIR=/home/$USERNAME/disk-tees
+if [ ! -d $PROJECT_DIR ]; then
+    cd /home/$USERNAME
     git clone https://github.com/davidchuyaya/disk-tees.git
 fi
 
 cd ${HOME_DIR}/disk-tees
-cloud_scripts/db_benchmark/benchbase_install.sh -t $TRUSTED_MODE
+cloud_scripts/db_benchmark/benchbase_install.sh
 cd ${HOME_DIR}/disk-tees
-cloud_scripts/db_benchmark/benchbase_run.sh -i $CLIENT_IP -t $TRUSTED_MODE
+cloud_scripts/db_benchmark/benchbase_run.sh -i $CLIENT_IP

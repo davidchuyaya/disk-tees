@@ -1,6 +1,6 @@
 #!/bin/bash
 print_usage() {
-  printf "Usage: ./$0 -t <trusted mode> -p <postgres mode> [-w <wait secs before running> -m <tmpfs memory size (GB)>]\n"
+  printf "Usage: $0 -t <trusted mode> -p <postgres mode> [-w <wait secs before running> -m <tmpfs memory size (GB)>]\n"
   printf "Options:\n"
   printf "  -t <trusted mode>    Options: trusted, untrusted, local\n"
   printf "  -p <postgres mode>   Options: normal (postgres on a single machine)\n"
@@ -35,35 +35,12 @@ RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${POSTGRES_MODE}
 NUM_REPLICAS=3
 NUM_CCF_NODES=3
 
-# Before changing LOCATION, ZONE, or VM_SIZE, make sure the new location has VMs of that size available.
-case $TRUSTED_MODE in
-  "trusted")
-    PROJECT_DIR=/home/azureuser/disk-tees
-    LOCATION="northeurope"
-    ZONE=2
-    VM_SIZE="Standard_DC8as_v5"
-    IMAGE="Canonical:0001-com-ubuntu-confidential-vm-focal:20_04-lts-cvm:latest"
-    TRUSTED_PARAMS="--security-type ConfidentialVM
-                    --os-disk-security-encryption-type VMGuestStateOnly
-                    --enable-vtpm";;
-  "untrusted")
-    PROJECT_DIR=/home/azureuser/disk-tees
-    LOCATION="swedencentral"
-    ZONE=2
-    VM_SIZE="Standard_D8as_v5"
-    IMAGE="Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest";;
-  "local")
-    PROJECT_DIR=~/disk-tees;;
-  *)
-    echo "Invalid trusted mode selected."
-    print_usage
-    exit 1;;
-esac
+USERNAME=$(whoami)
+PROJECT_DIR=/home/$USERNAME/disk-tees
 CLIENT_INIT_SCRIPT_NAME=client_init_${POSTGRES_MODE}.sh
-# Note: All these scripts start with ~/disk-tees because they are only used by the launcher, and will be copied via cloud-init to the VMs.
-CLIENT_INIT_SCRIPT=~/disk-tees/cloud_scripts/cloud_init/${CLIENT_INIT_SCRIPT_NAME}
-BENCHBASE_INIT_SCRIPT=~/disk-tees/cloud_scripts/cloud_init/benchbase_init.sh
-REPLICA_INIT_SCRIPT=~/disk-tees/cloud_scripts/cloud_init/replica_init.sh
+CLIENT_INIT_SCRIPT=$PROJECT_DIR/cloud_scripts/cloud_init/${CLIENT_INIT_SCRIPT_NAME}
+BENCHBASE_INIT_SCRIPT=$PROJECT_DIR/cloud_scripts/cloud_init/benchbase_init.sh
+REPLICA_INIT_SCRIPT=$PROJECT_DIR/cloud_scripts/cloud_init/replica_init.sh
 
 
 ############################################################################### Run locally
@@ -164,6 +141,27 @@ fi
 
 
 ############################################################################### Run on azure
+# Before changing LOCATION, ZONE, or VM_SIZE, make sure the new location has VMs of that size available.
+case $TRUSTED_MODE in
+  "trusted")
+    LOCATION="northeurope"
+    ZONE=2
+    VM_SIZE="Standard_DC8as_v5"
+    IMAGE="Canonical:0001-com-ubuntu-confidential-vm-focal:20_04-lts-cvm:latest"
+    TRUSTED_PARAMS="--security-type ConfidentialVM
+                    --os-disk-security-encryption-type VMGuestStateOnly
+                    --enable-vtpm";;
+  "untrusted")
+    LOCATION="swedencentral"
+    ZONE=2
+    VM_SIZE="Standard_D8as_v5"
+    IMAGE="Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest";;
+  *)
+    echo "Invalid trusted mode selected."
+    print_usage
+    exit 1;;
+esac
+
 # Create a resource group
 az group create \
   --subscription $SUBSCRIPTION \
@@ -188,7 +186,7 @@ az vm create \
   --resource-group $RESOURCE_GROUP \
   --name $POSTGRES_MODE \
   --count $NUM_VMS \
-  --admin-username azureuser \
+  --admin-username $USERNAME \
   --generate-ssh-keys \
   --public-ip-sku Standard \
   --nic-delete-option Delete \

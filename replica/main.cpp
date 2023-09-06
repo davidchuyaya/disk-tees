@@ -41,10 +41,8 @@ config parseArgs(int argc, char* argv[]) {
 }
 
 std::string getPath(const config& conf) {
-    if (std::string(conf.trustedMode) == "local")
-        return std::string(getenv("HOME")) + "/disk-tees/build/replica" + std::to_string(conf.id);
-    else
-        return "/home/azureuser/disk-tees/build/replica" + std::to_string(conf.id);
+    std::string username = getlogin();
+    return "/home/" + username + "/disk-tees/build/replica" + std::to_string(conf.id);
 }
 
 int main(int argc, char* argv[]) {

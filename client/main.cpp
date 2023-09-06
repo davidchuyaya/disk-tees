@@ -25,10 +25,8 @@ static const struct fuse_opt config_spec[] = {
 };
 
 std::string getPath() {
-    if (std::string(config.trustedMode) == "local")
-        return std::string(getenv("HOME")) + "/disk-tees/build/client" + std::to_string(config.id);
-    else
-        return "/home/azureuser/disk-tees/build/client" + std::to_string(config.id);
+    std::string username = getlogin();
+    return "/home/" + username + "/disk-tees/build/client" + std::to_string(config.id);
 }
 
 matchB matchmake(CCFNetwork& ccfNetwork, const int id, const networkConfig& replicaConf) {
@@ -141,7 +139,6 @@ int main(int argc, char* argv[]) {
                 ss << path << "/../../cloud_scripts/unzip_disk.sh";
                 ss << " -s replica" << disk.id;
                 ss << " -d " << name;
-                ss << " -t " << config.trustedMode;
                 ss << " -c " << disk.diskChecksum;
                 std::cout << "Executing command: " << ss.str() << std::endl;
                 int errorCode = system(ss.str().c_str());

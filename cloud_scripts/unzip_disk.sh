@@ -1,6 +1,6 @@
 #!/bin/bash
 print_usage() {
-    echo "Usage: $0 -s <source name> -d <destination name> -t <trusted mode> -c <checksum>"
+    echo "Usage: $0 -s <source name> -d <destination name> -c <checksum>"
     echo "Unzip disk if it matches the checksum"
 }
 
@@ -9,22 +9,18 @@ if (( $# == 0 )); then
     exit 1
 fi
 
-while getopts 's:d:t:c:' flag; do
+while getopts 's:d:c:' flag; do
   case ${flag} in
     s) SRC_NAME=${OPTARG} ;;
     d) DST_NAME=${OPTARG} ;;
-    t) TRUSTED_MODE=${OPTARG} ;;
     c) CHECKSUM=${OPTARG} ;;
     *) print_usage
        exit 1;;
   esac
 done
 
-if [ $TRUSTED_MODE == "local" ]; then
-    BUILD_DIR=~/disk-tees/build/$DST_NAME
-else
-    BUILD_DIR=/home/azureuser/disk-tees/build/$DST_NAME
-fi
+USERNAME=$(whoami)
+BUILD_DIR=/home/$USERNAME/disk-tees/build/$DST_NAME
 SRC_FILE=$BUILD_DIR/zipped-storage/$SRC_NAME.tar.gz
 OUTPUT_DIR=$BUILD_DIR/storage
 

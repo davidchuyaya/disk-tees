@@ -1,6 +1,6 @@
 #!/bin/bash
 print_usage() {
-    echo "Usage: $0 -n <name> -t <trusted mode>"
+    echo "Usage: $0 -n <name>"
     echo "Periodically calls 'ls' on the FUSE directory so it can poll for messages (for reconfiguration)"
 }
 
@@ -9,20 +9,16 @@ if (( $# == 0 )); then
     exit 1
 fi
 
-while getopts 'n:t:' flag; do
+while getopts 'n:' flag; do
   case ${flag} in
     n) NAME=${OPTARG} ;;
-    t) TRUSTED_MODE=${OPTARG} ;;
     *) print_usage
        exit 1;;
   esac
 done
 
-if [ $TRUSTED_MODE == "local" ]; then
-    BUILD_DIR=~/disk-tees/build/$NAME
-else
-    BUILD_DIR=/home/azureuser/disk-tees/build/$NAME
-fi
+USERNAME=$(whoami)
+BUILD_DIR=/home/$USERNAME/disk-tees/build/$NAME
 SRC_DIR=$BUILD_DIR/shim
 
 while true; do

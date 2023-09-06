@@ -3,7 +3,7 @@
 # Running benchbase, assuming postgres has been setup and the IP is known
 #
 print_usage() {
-    echo "Usage: $0 -i <client IP address> -t <trusted mode>"
+    echo "Usage: $0 -i <client IP address>"
 }
 
 if (( $# == 0 )); then
@@ -14,7 +14,6 @@ fi
 while getopts 'i:t:' flag; do
   case ${flag} in
     i) CLIENT_IP=${OPTARG} ;;
-    t) TRUSTED_MODE=${OPTARG} ;;
     *) print_usage
        exit 1;;
   esac
@@ -22,13 +21,8 @@ done
 
 NUM_RUNS=3
 
-if [ $TRUSTED_MODE == "local" ]; then
-    cd ~
-else
-    cd /home/azureuser
-fi
-
-cd benchbase/target/benchbase-postgres
+USERNAME=$(whoami)
+cd /home/$USERNAME/benchbase/target/benchbase-postgres
 # Modify IP address in config
 sed -i "s/localhost/$CLIENT_IP/g" config/postgres/sample_tpcc_config.xml
 for i in $(seq 1 $NUM_RUNS)

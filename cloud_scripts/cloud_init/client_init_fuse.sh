@@ -7,16 +7,15 @@
 #   ID: client ID
 #   TMPFS_MEMORY: how much memory to allocate to tmpfs (in Gb)
 
-if [ $TRUSTED_MODE == "local" ]; then
-    HOME_DIR=~
-    # Assume that disk-tees has been cloned if this is executing locally
-else
-    HOME_DIR=/home/azureuser
+USERNAME=$(whoami)
+PROJECT_DIR=/home/$USERNAME/disk-tees
+if [ ! -d $PROJECT_DIR ]; then
+    cd /home/$USERNAME
     git clone https://github.com/davidchuyaya/disk-tees.git
 fi
 
 NAME=client${ID}
-BUILD_DIR=$HOME_DIR/disk-tees/build/$NAME
+BUILD_DIR=$PROJECT_DIR/build/$NAME
 mkdir -p $BUILD_DIR
 
 # Create directory to store files
@@ -29,10 +28,10 @@ DIR=${BUILD_DIR}/shim
 mkdir -p $DIR
 
 # Make tee_fuse and mount it on $DIR
-cd $HOME_DIR/disk-tees
+cd $PROJECT_DIR
 cmake .
 make
 cd $BUILD_DIR
-$HOME_DIR/disk-tees/client/tee_fuse -i $ID -t $TRUSTED_MODE -s $DIR
-$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_install.sh -t $TRUSTED_MODE
-$HOME_DIR/disk-tees/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR
+$PROJECT_DIR/client/tee_fuse -i $ID -t $TRUSTED_MODE -s $DIR
+$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh
+$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR
