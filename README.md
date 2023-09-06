@@ -45,7 +45,21 @@ The certificates for CCF can be found in `build/workspace/sandbox_common`, and i
 ### Running on Azure
 
 Launch the VMs with `./launch.sh` in the section above, with `-t untrusted` or `-t trusted` based on whether you want regular or confidential VMs.
+Then, start the actual machines in the following order:
+```bash
+./run -t <trusted_mode> -p <postgres_mode> -n ccf
+./run -t <trusted_mode> -p <postgres_mode> -n replicas -m <tmpfs memory>
+./run -t <trusted_mode> -p <postgres_mode> -n clients -w <wait time> -m <tmpfs memory>
+./run -t <trusted_mode> -p <postgres_mode> -n benchbase
+```
 
+Only the client and benchbase need to be run if `<postgres_mode>` is not `rollbaccine`.
+Here's what happens during startup and why the order is important:
+1. CCF launches
+2. Replicas send their certificates to CCF
+3. The client send its certificate to CCF, downloads the certificates of the replicas in its configuration, completes matchmaking with that configuration, then begins leader election with the replicas.
+4. Replicas receive the new configuration from the client, query CCF for the replicas' certificates, and connect to each other.
+5. Once the client has won leader election, writes can occur (from postgres, for example).
 
 ### Cleaning up
 
