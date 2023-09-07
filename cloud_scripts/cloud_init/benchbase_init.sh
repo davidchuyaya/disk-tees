@@ -12,7 +12,5 @@ if [ ! -d $PROJECT_DIR ]; then
     git clone https://github.com/davidchuyaya/disk-tees.git
 fi
 
-cd $PROJECT_DIR
-cloud_scripts/db_benchmark/benchbase_install.sh -u $USERNAME
-cd $PROJECT_DIR
-cloud_scripts/db_benchmark/benchbase_run.sh -i $CLIENT_IP -u $USERNAME
+$PROJECT_DIR/cloud_scripts/db_benchmark/benchbase_install.sh -u $USERNAME
+$PROJECT_DIR/cloud_scripts/db_benchmark/benchbase_run.sh -i $CLIENT_IP -u $USERNAME
