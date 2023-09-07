@@ -25,6 +25,8 @@ USERNAME=$(whoami)
 cd /home/$USERNAME/benchbase/target/benchbase-postgres
 # Modify IP address in config
 sed -i "s/localhost/$CLIENT_IP/g" config/postgres/sample_tpcc_config.xml
+# 10 warehouses
+sed -i "s=<scalefactor>1</scalefactor>=<scalefactor>10</scalefactor>=g" config/postgres/sample_tpcc_config.xml
 for i in $(seq 1 $NUM_RUNS)
 do
     echo "Run $i of $NUM_RUNS"

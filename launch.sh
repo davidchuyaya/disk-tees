@@ -145,7 +145,7 @@ fi
 case $TRUSTED_MODE in
   "trusted")
     LOCATION="northeurope"
-    ZONE=2
+    ZONE=3
     VM_SIZE="Standard_DC8as_v5"
     IMAGE="Canonical:0001-com-ubuntu-confidential-vm-focal:20_04-lts-cvm:latest"
     TRUSTED_PARAMS="--security-type ConfidentialVM
@@ -192,7 +192,6 @@ az vm create \
   --nic-delete-option Delete \
   --os-disk-delete-option Delete \
   --data-disk-delete-option Delete \
-  --accelerated-networking \
   --ppg ${RESOURCE_GROUP}_ppg \
   --location $LOCATION \
   --zone $ZONE \
