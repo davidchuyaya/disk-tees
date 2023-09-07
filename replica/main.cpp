@@ -8,29 +8,27 @@
 #include "../shared/fuse_messages.hpp"
 #include "replica_fuse.hpp"
 
-struct config {
-    int id;
-    std::string trustedMode;
-};
-
 config parseArgs(int argc, char* argv[]) {
     config conf = {};
 
     // set default values
     if (argc == 1) {
-        std::cerr << "Usage: " << argv[0] << " -i <id> -t <trusted mode>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " -i <id> -t <trusted mode> -u <username>" << std::endl;
         exit(EXIT_FAILURE);
     }
 
     // Parse command line agruments
     int opt;
-    while ((opt = getopt(argc, argv, "i:t:")) != -1) {
+    while ((opt = getopt(argc, argv, "i:t:u:")) != -1) {
         switch (opt) {
             case 'i':
                 conf.id = atoi(optarg);
                 break;
             case 't':
                 conf.trustedMode = optarg;
+                break;
+            case 'u':
+                conf.username = optarg;
                 break;
             case '?':
                 exit(EXIT_FAILURE);
@@ -40,19 +38,14 @@ config parseArgs(int argc, char* argv[]) {
     return conf;
 }
 
-std::string getPath(const config& conf) {
-    std::string username = getlogin();
-    return "/home/" + username + "/disk-tees/build/replica" + std::to_string(conf.id);
-}
-
 int main(int argc, char* argv[]) {
     config conf = parseArgs(argc, argv);
-    
-    std::string path = getPath(conf);
+
+    std::string path = "/home/" + conf.username + "/disk-tees/build/replica" + std::to_string(conf.id);
     networkConfig ccfConf = NetworkConfig::readNetworkConfig("ccf.json");
     std::string name = "replica" + std::to_string(conf.id);
 
-    ReplicaFuse replicaFuse(conf.id, name, conf.trustedMode, path + "/storage", ccfConf, path);
+    ReplicaFuse replicaFuse(conf, name, path + "/storage", ccfConf, path);
     TLS<clientMsg> clientTLS(conf.id, name, Replica, {}, path, [&](const clientMsg& payload, const std::string& addr) {
        replicaFuse.bufferMsg(payload, addr);
     });
