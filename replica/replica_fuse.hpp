@@ -9,9 +9,15 @@
 using namespace std::chrono_literals;
 static const std::chrono::minutes FSYNC_TIMEOUT = 1min;
 
+struct config {
+    int id;
+    std::string trustedMode;
+    std::string username;
+};
+
 class ReplicaFuse {
 public:
-    ReplicaFuse(const int id, const std::string& name, const std::string& trustedMode, const std::string& directory, const networkConfig& ccf, const std::string& path);
+    ReplicaFuse(const config& conf, const std::string& name, const std::string& directory, const networkConfig& ccf, const std::string& path);
     void addClientTLS(TLS<clientMsg> *tls);
     void bufferMsg(const clientMsg& msg, const std::string& addr);
     void processPendingMessages();
@@ -42,9 +48,8 @@ public:
     void operator()(const p2a& msg);
 
 private:
-    const int id;
+    const config conf;
     const std::string name;
-    const std::string trustedMode;
     const std::string directory;
     const networkConfig ccf;
     const std::string path;

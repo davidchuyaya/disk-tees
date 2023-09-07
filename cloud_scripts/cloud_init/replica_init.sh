@@ -8,8 +8,8 @@
 #   TRUSTED_MODE: "local", "trusted", or "untrusted"
 #   ID: replica ID
 #   TMPFS_MEMORY: how much memory to allocate to tmpfs (in Gb)
+#   USERNAME: username of the machine that launched these scripts
 
-USERNAME=$(whoami)
 PROJECT_DIR=/home/$USERNAME/disk-tees
 if [ ! -d $PROJECT_DIR ]; then
     cd /home/$USERNAME
@@ -44,4 +44,4 @@ cd $PROJECT_DIR
 cmake .
 make
 cd $BUILD_DIR
-$PROJECT_DIR/replica/disk_tees -i $ID -t $TRUSTED_MODE
+$PROJECT_DIR/replica/disk_tees -i $ID -t $TRUSTED_MODE -u $USERNAME

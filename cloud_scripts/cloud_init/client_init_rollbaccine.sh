@@ -10,8 +10,8 @@
 #   ID: client ID
 #   TMPFS_MEMORY: how much memory to allocate to tmpfs (in Gb)
 #   WAIT_SECS: how long to wait between starting the client and starting postgres
+#   USERNAME: username of the machine that launched these scripts
 
-USERNAME=$(whoami)
 PROJECT_DIR=/home/$USERNAME/disk-tees
 if [ ! -d $PROJECT_DIR ]; then
     cd /home/$USERNAME
@@ -49,7 +49,7 @@ DIR=${BUILD_DIR}/shim
 mkdir -p $DIR
 
 # Start background process to make sure FUSE checks for messages periodically
-$PROJECT_DIR/cloud_scripts/fuse_waker.sh -n $NAME &
+$PROJECT_DIR/cloud_scripts/fuse_waker.sh -n $NAME -u $USERNAME &
 
 # Make tee_fuse and mount it on $DIR
 cd $PROJECT_DIR
@@ -58,8 +58,8 @@ make
 cd $BUILD_DIR
 # tee_fuse has issues if it's run too early after cmake?
 sleep 1
-$PROJECT_DIR/client/tee_fuse -i $ID -t $TRUSTED_MODE -n -f -s $DIR > $BUILD_DIR/log.txt 2>&1 &
+$PROJECT_DIR/client/tee_fuse -i $ID -t $TRUSTED_MODE -u $USERNAME -n -f -s $DIR > $BUILD_DIR/log.txt 2>&1 &
 # Install and run postgres
 sleep $WAIT_SECS
-$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh
+$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh -u $USERNAME
 $PROJECT_DIR/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR

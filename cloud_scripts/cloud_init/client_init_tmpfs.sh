@@ -6,8 +6,8 @@
 #   TRUSTED_MODE: "local", "trusted", or "untrusted"
 #   ID: client ID
 #   TMPFS_MEMORY: how much memory to allocate to tmpfs (in Gb)
+#   USERNAME: username of the machine that launched these scripts
 
-USERNAME=$(whoami)
 PROJECT_DIR=/home/$USERNAME/disk-tees
 if [ ! -d $PROJECT_DIR ]; then
     cd /home/$USERNAME
@@ -18,7 +18,7 @@ NAME=client${ID}
 BUILD_DIR=$PROJECT_DIR/build/$NAME
 mkdir -p $BUILD_DIR
 
-$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh
+$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh -u $USERNAME
 DIR=$BUILD_DIR/shim
 mkdir -p $DIR
 sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $DIR

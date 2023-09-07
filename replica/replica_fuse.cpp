@@ -21,8 +21,8 @@
 #define REPLICA_PREPEND_PATH(path) (path)
 #endif
 
-ReplicaFuse::ReplicaFuse(const int id, const std::string& name, const std::string& trustedMode, const std::string& directory, const networkConfig& ccf, const std::string& path) :
-    id(id), name(name), trustedMode(trustedMode), directory(directory), ccf(ccf), path(path) {
+ReplicaFuse::ReplicaFuse(const config& conf, const std::string& name, const std::string& directory, const networkConfig& ccf, const std::string& path) :
+    conf(conf), name(name), directory(directory), ccf(ccf), path(path) {
 }
 
 void ReplicaFuse::addClientTLS(TLS<clientMsg>* tls) {
@@ -185,7 +185,7 @@ void ReplicaFuse::operator()(const releaseParams& params) {
 void ReplicaFuse::operator()(const fsyncParams& params) {
     // Reply to client to confirm commit
     clientTLS->send<replicaMsg>(fsyncAck {
-        .id = id,
+        .id = conf.id,
         .written = written,
         .r = params.r
     }, client);
@@ -231,7 +231,7 @@ void ReplicaFuse::operator()(const p1a& msg) {
 
     // Reply to the sender
     clientTLS->send<replicaMsg>(p1b {
-        .id = id,
+        .id = conf.id,
         .clientBallot = msg.r,
         .written = written,
         .normalBallot = normalBallot,
@@ -244,7 +244,7 @@ void ReplicaFuse::operator()(const p1a& msg) {
     // Connect to replicas in the new config
     // 1. Remove self from list of replicas in config (so we don't send to ourselves)
     networkConfig netConfWithoutSelf = msg.netConf;
-    netConfWithoutSelf.erase(id);
+    netConfWithoutSelf.erase(conf.id);
     replicas = NetworkConfig::configToAddrs(Replica, netConfWithoutSelf);
 
     // 2. Find the set of new replicas to connect to
@@ -277,7 +277,8 @@ void ReplicaFuse::operator()(const diskReq& msg) {
     ss << " -s " << name;
     ss << " -d client" << msg.id;
     ss << " -a " << sender << ":" << NetworkConfig::getPort(Client, msg.id);
-    ss << " -t " << trustedMode;
+    ss << " -t " << conf.trustedMode;
+    ss << " -u " << conf.username;
     ss << " -z";
     std::cout << "Executing command: " << ss.str() << std::endl;
     int errorCode = system(ss.str().c_str());
@@ -299,7 +300,7 @@ void ReplicaFuse::operator()(const diskReq& msg) {
 
     // Send checksum to client
     clientTLS->send<replicaMsg>(disk {
-        .id = id,
+        .id = conf.id,
         .clientBallot = msg.r,
         .diskChecksum = checksum
     }, sender);
@@ -321,6 +322,7 @@ void ReplicaFuse::operator()(const p2a& msg) {
         ss << " -s " << msg.diskReplicaName;
         ss << " -d " << name;
         ss << " -c " << msg.diskChecksum;
+        ss << " -u " << conf.username;
         std::cout << "Executing command: " << ss.str() << std::endl;
         int errorCode = system(ss.str().c_str());
 
@@ -346,7 +348,7 @@ void ReplicaFuse::operator()(const p2a& msg) {
 
     // Reply to client
     clientTLS->send<replicaMsg>(p2b {
-        .id = id,
+        .id = conf.id,
         .clientBallot = msg.r,
         .highestBallot = highestBallot
     }, sender);
@@ -450,7 +452,7 @@ void ReplicaFuse::checkFsyncTimeout() {
 
     clientTLS->send<replicaMsg>(
         fsyncMissing{
-            .id = id,
+            .id = conf.id,
             .r = lastFsync.r,
             .fsyncSeq = lastFsync.seq,
             .holes = holes,

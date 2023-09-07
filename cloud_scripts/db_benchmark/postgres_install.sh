@@ -2,7 +2,23 @@
 #
 # Downloading and building postgres
 #
-USERNAME=$(whoami)
+print_usage() {
+    echo "Usage: $0 -u <username>"
+}
+
+if (( $# == 0 )); then
+    print_usage
+    exit 1
+fi
+
+while getopts 'u:' flag; do
+  case ${flag} in
+    u) USERNAME=${OPTARG} ;;
+    *) print_usage
+       exit 1;;
+  esac
+done
+
 BUILD_DIR=/home/$USERNAME/disk-tees/build
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR

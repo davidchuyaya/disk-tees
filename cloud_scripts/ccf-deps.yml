@@ -1,0 +1,69 @@
+# Ansible will use this file to install the dependencies for CCF on each VM
+# From https://github.com/microsoft/CCF/blob/main/getting_started/setup_vm/app-run.yml
+- hosts: all
+  vars:
+    run_only: true
+    ccf_ver: "latest"
+    run_js: false
+    ccf_js_app_name: "libjs_generic"
+    platform: "virtual"
+  tasks:
+    # From https://github.com/microsoft/CCF/blob/main/getting_started/setup_vm/roles/llvm_repo/tasks/install.yml
+    - name: Add LLVM repository key
+      apt_key:
+        url: "https://apt.llvm.org/llvm-snapshot.gpg.key"
+        state: present
+      become: yes
+    - name: Add LLVM repository
+      apt_repository:
+        repo: "deb http://apt.llvm.org/{{ ansible_distribution_release }} llvm-toolchain-{{ ansible_distribution_release }}-15 main"
+        state: present
+        update_cache: yes
+      become: yes
+    # From https://github.com/microsoft/CCF/blob/main/getting_started/setup_vm/roles/ccf_install/tasks/deb_install.yml
+    - name: Get package url
+      shell:
+        cmd: |
+          if [ "{{ ccf_ver }}" = "latest" ]; then
+            curl -s https://api.github.com/repos/microsoft/ccf/releases/latest | egrep 'https://.*\.deb' | egrep {{ platform }} | egrep -v unsafe | cut -d\" -f4
+          else
+            echo "https://github.com/microsoft/CCF/releases/download/ccf-{{ ccf_ver }}/ccf_{{ platform }}_{{ ccf_ver | replace('-', '_') }}_amd64.deb"
+          fi
+      register: ccf_deb_url
+
+    - name: Install CCF
+      apt:
+        deb: "{{ ccf_deb_url.stdout }}"
+      become: true
+
+    - name: Copy cchost
+      copy:
+        src: "/opt/ccf_{{ platform }}/bin/cchost"
+        dest: "/usr/bin/cchost"
+        remote_src: true
+        mode: a=rx
+      become: true
+      when: run_only|bool
+
+    - name: Create ccf folder in /usr/lib
+      file:
+        path: "/usr/lib/ccf"
+        state: directory
+        recurse: yes
+      become: true
+      when: run_js|bool
+
+    - name: Copy JS generic (Virtual)
+      copy:
+        src: "/opt/ccf_{{ platform }}/lib/{{ ccf_js_app_name }}.virtual.so"
+        dest: "/usr/lib/ccf/{{ ccf_js_app_name }}.virtual.so"
+        remote_src: true
+      become: true
+      when: (run_js|bool) and (platform == "virtual")
+
+    - name: Remove release
+      apt:
+        name: "ccf_{{ platform }}"
+        state: absent
+      become: true
+      when: run_only|bool

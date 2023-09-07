@@ -46,12 +46,14 @@ fi
 
 echo "Creating JSONs for CCF and replicas, if necessary. The 1st VM will always be the client, the 2nd the benchmark process, then CCF and replicas."
 CCF_JSON=build/ccf.json
+CCF_ANSIBLE_INVENTORY=build/ccf_ansible_inventory
 REPLICAS_JSON=build/replicas.json
 readarray -t PRIVATE_IPS < <(jq -r -c '.[].privateIps' $VMS_JSON)
-if [ ! -f $CCF_JSON ] || [ ! -f $REPLICAS_JSON ]
+if [ ! -f $CCF_JSON ] || [ ! -f $REPLICAS_JSON ] || [ ! -f $CCF_ANSIBLE_INVENTORY ]
 then
     echo '[' > $CCF_JSON
     echo '[' > $REPLICAS_JSON
+    echo '[all]' > $CCF_ANSIBLE_INVENTORY
     for i in "${!PRIVATE_IPS[@]}"
     do
         if (( $i >= 2 )) && (( $i < 2 + $NUM_CCF_NODES ))
@@ -59,6 +61,7 @@ then
             ID=$(($i - 2))
             PORT=$(($CCF_START_PORT + $ID))
             echo '{"ip": "'${PRIVATE_IPS[$i]}:$PORT'", "id": '$ID'}' >> $CCF_JSON
+            echo ${PRIVATE_IPS[$i]} >> $CCF_ANSIBLE_INVENTORY
         elif (( $i >= 2 + $NUM_CCF_NODES ))
         then
             ID=$(($i - 2 - $NUM_CCF_NODES))
@@ -112,6 +115,7 @@ case $NODE_TYPE in
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v 0
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n WAIT_SECS -v $WAIT_SECS
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
+        $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
         ssh -o StrictHostKeyChecking=no $USERNAME@${PUBLIC_IPS[0]} "bash -s" -- < $NEW_INIT_SCRIPT
         ;;
     "benchbase")
@@ -121,12 +125,14 @@ case $NODE_TYPE in
         cp $BENCHBASE_INIT_SCRIPT $NEW_INIT_SCRIPT
         # Attach variables
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n CLIENT_IP -v ${PRIVATE_IPS[0]}
+        $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
         ssh -o StrictHostKeyChecking=no $USERNAME@${PUBLIC_IPS[1]} "bash -s" -- < $NEW_INIT_SCRIPT
         # Download results
         echo "Downloading results to $BENCHBASE_DIR/results..."
         scp -r $USERNAME@${PUBLIC_IPS[1]}:/home/$USERNAME/benchbase/target/benchbase-postgres/results $BENCHBASE_DIR
         ;;
     "ccf")
+        ansible-playbook $PROJECT_DIR/cloud_scripts/ccf-deps.yml -i $CCF_ANSIBLE_INVENTORY
         CCF_ADDRS=""
         for i in "${!PUBLIC_IPS[@]}"
         do
@@ -155,6 +161,7 @@ case $NODE_TYPE in
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v $i
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
+        $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
         for i in "${!PUBLIC_IPS[@]}"
         do
             if (($i >= 2 + $NUM_CCF_NODES))

@@ -1,6 +1,6 @@
 #!/bin/bash
 print_usage() {
-    echo "Usage: $0 -s <source name> -d <destination name> -c <checksum>"
+    echo "Usage: $0 -s <source name> -d <destination name> -c <checksum> -u <username>"
     echo "Unzip disk if it matches the checksum"
 }
 
@@ -9,17 +9,17 @@ if (( $# == 0 )); then
     exit 1
 fi
 
-while getopts 's:d:c:' flag; do
+while getopts 's:d:c:u:' flag; do
   case ${flag} in
     s) SRC_NAME=${OPTARG} ;;
     d) DST_NAME=${OPTARG} ;;
     c) CHECKSUM=${OPTARG} ;;
+    u) USERNAME=${OPTARG} ;;
     *) print_usage
        exit 1;;
   esac
 done
 
-USERNAME=$(whoami)
 BUILD_DIR=/home/$USERNAME/disk-tees/build/$DST_NAME
 SRC_FILE=$BUILD_DIR/zipped-storage/$SRC_NAME.tar.gz
 OUTPUT_DIR=$BUILD_DIR/storage

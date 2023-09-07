@@ -13,6 +13,7 @@ static struct config {
     int id;
     bool network;
     const char* trustedMode;
+    const char* username;
 } config;
 
 // Fuse parsing logic from: https://github.com/libfuse/libfuse/blob/master/example/hello.c
@@ -20,14 +21,10 @@ static struct config {
 static const struct fuse_opt config_spec[] = {
 	OPTION("-i %d", id),
     OPTION("-t %s", trustedMode),
+    OPTION("-u %s", username),
     OPTION("-n", network),
 	FUSE_OPT_END
 };
-
-std::string getPath() {
-    std::string username = getlogin();
-    return "/home/" + username + "/disk-tees/build/client" + std::to_string(config.id);
-}
 
 matchB matchmake(CCFNetwork& ccfNetwork, const int id, const networkConfig& replicaConf) {
     ballot r {
@@ -50,7 +47,7 @@ int main(int argc, char* argv[]) {
     if (fuse_opt_parse(&args, &config, config_spec, NULL) == 1)
         exit(EXIT_FAILURE);
 
-    std::string path = getPath();
+    std::string path = "/home/" + std::string(config.username) + "/disk-tees/build/client" + std::to_string(config.id);
 
     // No replicas
     if (!config.network) {
@@ -140,6 +137,7 @@ int main(int argc, char* argv[]) {
                 ss << " -s replica" << disk.id;
                 ss << " -d " << name;
                 ss << " -c " << disk.diskChecksum;
+                ss << " -u " << config.username;
                 std::cout << "Executing command: " << ss.str() << std::endl;
                 int errorCode = system(ss.str().c_str());
 
@@ -177,6 +175,7 @@ int main(int argc, char* argv[]) {
                 ss << " -s " << replicaName;
                 ss << " -d replica" << id;
                 ss << " -a " << ip << ":" << NetworkConfig::getPort(Replica, id);
+                ss << " -u " << config.username;
                 ss << " -t " << config.trustedMode; // Note: Excludes -z because we're just sending the already-zipped disk, don't need to rezip
                 std::cout << "Executing command: " << ss.str() << std::endl;
                 int errorCode = system(ss.str().c_str());

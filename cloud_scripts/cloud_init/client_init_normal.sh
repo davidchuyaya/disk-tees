@@ -4,8 +4,8 @@
 #
 # Assumes the following variables will be inserted via attach_var.sh:
 #   ID: client ID
+#   USERNAME: username of the machine that launched these scripts
 
-USERNAME=$(whoami)
 PROJECT_DIR=/home/$USERNAME/disk-tees
 if [ ! -d $PROJECT_DIR ]; then
     cd /home/$USERNAME
@@ -17,7 +17,7 @@ BUILD_DIR=$PROJECT_DIR/build/$NAME
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 
-$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh
+$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh -u $USERNAME
 DIR=${BUILD_DIR}/shim
 mkdir -p $DIR
 $PROJECT_DIR/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR

@@ -1,6 +1,6 @@
 #!/bin/bash
 print_usage() {
-    echo "Usage: $0 -s <source name> -d <destination name> -a <destination ip:port> -t <trusted mode> [-z]"
+    echo "Usage: $0 -s <source name> -d <destination name> -a <destination ip:port> -t <trusted mode> -u <username> [-z]"
     echo "Copies the storage directory from source to dest and stores its md5 checksum. If -z is not specified, does not zip or create checksum."
 }
 
@@ -9,19 +9,19 @@ if (( $# == 0 )); then
     exit 1
 fi
 
-while getopts 's:d:a:t:z' flag; do
+while getopts 's:d:a:t:z:u' flag; do
   case ${flag} in
     s) SRC_NAME=${OPTARG} ;;
     d) DST_NAME=${OPTARG} ;;
     a) ADDR=${OPTARG} ;;
     t) TRUSTED_MODE=${OPTARG} ;;
+    u) USERNAME=${OPTARG} ;;
     z) ZIP=true ;;
     *) print_usage
        exit 1;;
   esac
 done
 
-USERNAME=$(whoami)
 BUILD_DIR=/home/$USERNAME/disk-tees/build/$SRC_NAME
 SRC_DIR=$BUILD_DIR/storage
 OUTPUT_FILE=$BUILD_DIR/zipped-storage/$SRC_NAME.tar.gz
