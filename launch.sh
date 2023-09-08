@@ -205,9 +205,12 @@ az vm create \
   --image $IMAGE $TRUSTED_PARAMS
 
 # Allow CCF nodes to listen to WSL on $CCF_PORT
-az network nsg rule create \
-  --resource-group $RESOURCE_GROUP \
-  --nsg-name ${POSTGRES_MODE}NSG \
-  --name allow_ccf \
-  --priority 1010 \
-  --destination-port-ranges $CCF_PORT
+if [[ $POSTGRES_MODE == "rollbaccine" ]]
+then
+  az network nsg rule create \
+    --resource-group $RESOURCE_GROUP \
+    --nsg-name ${POSTGRES_MODE}NSG \
+    --name allow_ccf \
+    --priority 1010 \
+    --destination-port-ranges $CCF_PORT
+fi

@@ -57,8 +57,7 @@ then
         if (( $i >= 2 )) && (( $i < 2 + $NUM_CCF_NODES ))
         then
             ID=$(($i - 2))
-            PORT=$(($CCF_START_PORT + $ID))
-            echo '{"ip": "'${PRIVATE_IPS[$i]}:$PORT'", "id": '$ID'}' >> $CCF_JSON
+            echo '{"ip": "'${PRIVATE_IPS[$i]}:$CCF_PORT'", "id": '$ID'}' >> $CCF_JSON
         elif (( $i >= 2 + $NUM_CCF_NODES ))
         then
             ID=$(($i - 2 - $NUM_CCF_NODES))
@@ -151,28 +150,27 @@ case $NODE_TYPE in
             --package /opt/ccf_virtual/lib/libjs_generic \
             --js-app-bundle ~/disk-tees/ccf $CCF_ADDRS # List of (local://|ssh://)hostname:port[,pub_hostnames:pub_port]
         ;;
-    "replicas")
-        REPLICA_DIR=$BUILD_DIR/replica$i
-        mkdir -p $REPLICA_DIR
-        NEW_INIT_SCRIPT=$REPLICA_DIR/replica_init.sh
-        # Attach CCF certificates and CCF JSON
-        $PROJECT_DIR/cloud_scripts/attach_file.sh -f $SERVICE_CERT -i $REPLICA_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
-        $PROJECT_DIR/cloud_scripts/attach_file.sh -f $USER_CERT -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
-        $PROJECT_DIR/cloud_scripts/attach_file.sh -f $USER_KEY -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
-        $PROJECT_DIR/cloud_scripts/attach_file.sh -f $CCF_JSON -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
-        # Attach variables
-        $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
-        $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v $i
-        $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
-        $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
-        for i in "${!PUBLIC_IPS[@]}"
+    "replicas")  
+        for ((i = 0; i < $NUM_REPLICAS; i++))
         do
-            if (($i >= 2 + $NUM_CCF_NODES))
-            then
-                # Don't stay connected to SSH, so we can launch multiple. See: https://unix.stackexchange.com/a/412586/386668
-                ssh -o StrictHostKeyChecking=no $USERNAME@${PUBLIC_IPS[$i]} screen -d -m "bash -s" -- < $NEW_INIT_SCRIPT
-            fi
+            REPLICA_DIR=$BUILD_DIR/replica$i
+            mkdir -p $REPLICA_DIR
+            NEW_INIT_SCRIPT=$REPLICA_DIR/replica_init.sh
+            # Attach CCF certificates and CCF JSON
+            $PROJECT_DIR/cloud_scripts/attach_file.sh -f $SERVICE_CERT -i $REPLICA_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
+            $PROJECT_DIR/cloud_scripts/attach_file.sh -f $USER_CERT -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
+            $PROJECT_DIR/cloud_scripts/attach_file.sh -f $USER_KEY -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
+            $PROJECT_DIR/cloud_scripts/attach_file.sh -f $CCF_JSON -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $REPLICA_DIR
+            # Attach variables
+            $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TRUSTED_MODE -v $TRUSTED_MODE
+            $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v $i
+            $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
+            $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
+            # Don't stay connected to SSH, so we can launch multiple. See: https://unix.stackexchange.com/a/412586/386668
+            INDEX=$(($i + 2 + $NUM_CCF_NODES))
+            ssh -o StrictHostKeyChecking=no $USERNAME@${PUBLIC_IPS[$INDEX]} "bash -s" -- < $NEW_INIT_SCRIPT
         done
+        echo "Finished starting replicas"
         ;;
     *) 
         echo "Invalid node type in run.sh."

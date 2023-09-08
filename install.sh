@@ -1,6 +1,6 @@
 #!/bin/bash
 sudo apt update
-sudo apt -y install cmake build-essential libssl-dev pkg-config libfuse3-dev fuse3
+sudo apt -y install cmake build-essential libssl-dev pkg-config libfuse3-dev fuse3 jq
 
 # Install a newer GCC to use C++20 features.
 sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
