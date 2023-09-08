@@ -7,6 +7,30 @@
     run_js: false
     ccf_js_app_name: "libjs_generic"
     platform: "virtual"
+    flc_enabled: true
+
+    sgx_group_name: "sgx_prv"
+
+    intel_sgx_packages:
+      - "libsgx-enclave-common"
+      - "libsgx-ae-qve"
+      - "libsgx-ae-pce"
+      - "libsgx-ae-qe3"
+      - "libsgx-qe3-logic"
+      - "libsgx-pce-logic"
+
+    intel_dcap_packages:
+      - "libsgx-dcap-ql"
+      - "libsgx-urts"
+      - "libsgx-quote-ex"
+      # Note: libsgx-dcap-ql-dev used to be automatically pulled by the
+      # open-enclave deb package until 0.18.4. This is only necessary
+      # to run <= 2.x CCF nodes that are built against OE <= 0.18.2.
+      - "libsgx-dcap-ql-dev"
+    oe_ver: "0.19.3"
+    # Usually the same, except for rc, where ver is -rc and ver_ is _rc
+    oe_ver_: "0.19.3"
+    oe_host_verify_deb: "https://github.com/openenclave/openenclave/releases/download/v{{ oe_ver }}/Ubuntu_2004_open-enclave-hostverify_{{ oe_ver_ }}_amd64.deb"
   tasks:
     # From https://github.com/microsoft/CCF/blob/main/getting_started/setup_vm/roles/llvm_repo/tasks/install.yml
     - name: Add LLVM repository key
@@ -20,6 +44,66 @@
         state: present
         update_cache: yes
       become: yes
+    # From https://github.com/microsoft/CCF/blob/main/getting_started/setup_vm/roles/intel/tasks/sgx-psw.yml
+    - name: Install apt-transport-https APT package
+      apt:
+        name: apt-transport-https
+        state: latest
+      become: true
+
+    - name: Add APT repository key
+      apt_key:
+        url: "https://download.01.org/intel-sgx/sgx_repo/ubuntu/intel-sgx-deb.key"
+        state: present
+      become: true
+
+    - name: Add APT repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.01.org/intel-sgx/sgx_repo/ubuntu {{ ansible_distribution_release }} main"
+        state: present
+        update_cache: yes
+      become: true
+
+    - name: Install the Intel libsgx packages
+      apt:
+        name: "{{ intel_sgx_packages }}"
+        state: latest
+        update_cache: yes
+        install_recommends: no
+      become: true
+
+    - name: Install the Intel DCAP packages
+      apt:
+        name: "{{ intel_dcap_packages }}"
+        state: latest
+        update_cache: yes
+        install_recommends: no
+      when: flc_enabled|bool
+      become: true
+    # From https://github.com/microsoft/CCF/blob/main/getting_started/setup_vm/app-run.yml
+    - name: Add Microsoft repository key
+      apt_key:
+        url: "https://packages.microsoft.com/keys/microsoft.asc"
+        state: present
+      become: true
+
+    - name: Add Microsoft sources list
+      apt_repository:
+        repo: "deb [arch=amd64] https://packages.microsoft.com/ubuntu/{{ ansible_distribution_version }}/prod {{ ansible_distribution_release }} main"
+        state: present
+      become: true
+
+    - name: Install the Azure DCAP Client
+      apt:
+        name: az-dcap-client
+        state: present
+        force: true
+      become: true
+    # From https://github.com/microsoft/CCF/blob/main/getting_started/setup_vm/roles/openenclave/tasks/install_host_verify.yml
+    - name: Install Open Enclave Host Verify
+      apt:
+        deb: "{{ oe_host_verify_deb }}"
+      become: true
     # From https://github.com/microsoft/CCF/blob/main/getting_started/setup_vm/roles/ccf_install/tasks/deb_install.yml
     - name: Get package url
       shell:

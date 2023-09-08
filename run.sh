@@ -34,7 +34,7 @@ done
 RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${POSTGRES_MODE}
 NUM_REPLICAS=3
 NUM_CCF_NODES=3
-CCF_START_PORT=10200
+CCF_PORT=10200
 
 echo "Fetching VM IP addresses, if necessary, assuming launch.sh has been run..."
 VMS_JSON=build/vms.json
@@ -46,14 +46,12 @@ fi
 
 echo "Creating JSONs for CCF and replicas, if necessary. The 1st VM will always be the client, the 2nd the benchmark process, then CCF and replicas."
 CCF_JSON=build/ccf.json
-CCF_ANSIBLE_INVENTORY=build/ccf_ansible_inventory
 REPLICAS_JSON=build/replicas.json
 readarray -t PRIVATE_IPS < <(jq -r -c '.[].privateIps' $VMS_JSON)
-if [ ! -f $CCF_JSON ] || [ ! -f $REPLICAS_JSON ] || [ ! -f $CCF_ANSIBLE_INVENTORY ]
+if [ ! -f $CCF_JSON ] || [ ! -f $REPLICAS_JSON ]
 then
     echo '[' > $CCF_JSON
     echo '[' > $REPLICAS_JSON
-    echo '[all]' > $CCF_ANSIBLE_INVENTORY
     for i in "${!PRIVATE_IPS[@]}"
     do
         if (( $i >= 2 )) && (( $i < 2 + $NUM_CCF_NODES ))
@@ -61,7 +59,6 @@ then
             ID=$(($i - 2))
             PORT=$(($CCF_START_PORT + $ID))
             echo '{"ip": "'${PRIVATE_IPS[$i]}:$PORT'", "id": '$ID'}' >> $CCF_JSON
-            echo ${PRIVATE_IPS[$i]} >> $CCF_ANSIBLE_INVENTORY
         elif (( $i >= 2 + $NUM_CCF_NODES ))
         then
             ID=$(($i - 2 - $NUM_CCF_NODES))
@@ -132,16 +129,22 @@ case $NODE_TYPE in
         scp -r $USERNAME@${PUBLIC_IPS[1]}:/home/$USERNAME/benchbase/target/benchbase-postgres/results $BENCHBASE_DIR
         ;;
     "ccf")
-        ansible-playbook $PROJECT_DIR/cloud_scripts/ccf-deps.yml -i $CCF_ANSIBLE_INVENTORY
+        # Create ansible inventory file, nodes argument for sandbox.sh
+        export ANSIBLE_HOST_KEY_CHECKING=False
+        CCF_ANSIBLE_INVENTORY=build/ccf_ansible_inventory
         CCF_ADDRS=""
+        echo '[all]' > $CCF_ANSIBLE_INVENTORY
         for i in "${!PUBLIC_IPS[@]}"
         do
             if (( $i >= 2 )) && (( $i < 2 + $NUM_CCF_NODES ))
             then
-                PORT=$(($CCF_START_PORT + $i - 2))
-                CCF_ADDRS+="--node ssh://"${PUBLIC_IPS[$i]}:$PORT" "
+                echo ${PUBLIC_IPS[$i]} >> $CCF_ANSIBLE_INVENTORY
+                CCF_ADDRS+="--node ssh://"${PRIVATE_IPS[$i]}:$CCF_PORT,${PUBLIC_IPS[$i]}:$CCF_PORT" "
             fi
         done
+        # Install CCF dependencies
+        ansible-playbook $PROJECT_DIR/cloud_scripts/ccf-deps.yml -i $CCF_ANSIBLE_INVENTORY
+        # Run sandbox.sh
         echo "CCF_ADDRS: $CCF_ADDRS"
         cd $BUILD_DIR
         /opt/ccf_virtual/bin/sandbox.sh --verbose \

@@ -34,6 +34,7 @@ SUBSCRIPTION="d8583813-7f3b-43a6-85ac-bac7e4751e5a" # Azure subscription interna
 RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${POSTGRES_MODE}
 NUM_REPLICAS=3
 NUM_CCF_NODES=3
+CCF_PORT=10200
 
 USERNAME=$(whoami)
 PROJECT_DIR=/home/$USERNAME/disk-tees
@@ -176,6 +177,7 @@ az ppg create \
   --resource-group $RESOURCE_GROUP \
   --name ${RESOURCE_GROUP}_ppg \
   --location $LOCATION \
+  --zone $ZONE \
   --intent-vm-sizes $VM_SIZE
 
 case $POSTGRES_MODE in
@@ -201,3 +203,11 @@ az vm create \
   --size $VM_SIZE \
   --data-disk-sizes-gb 32 \
   --image $IMAGE $TRUSTED_PARAMS
+
+# Allow CCF nodes to listen to WSL on $CCF_PORT
+az network nsg rule create \
+  --resource-group $RESOURCE_GROUP \
+  --nsg-name ${POSTGRES_MODE}NSG \
+  --name allow_ccf \
+  --priority 1010 \
+  --destination-port-ranges $CCF_PORT
