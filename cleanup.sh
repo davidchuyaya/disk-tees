@@ -1,4 +1,5 @@
 #!/bin/bash
+CLEANUP_REMOTE=false
 while getopts 'r' flag; do
   case ${flag} in
     r) CLEANUP_REMOTE=true ;;
@@ -56,7 +57,7 @@ rm -f ~/disk-tees/build/vms.json
 rm -f ~/disk-tees/build/ccf.log
 
 # Delete resource groups
-if [ $CLEANUP_REMOTE = true ]
+if [ "$CLEANUP_REMOTE" = true ]
 then
     echo "Deleting all possible resource groups, expect an error for those that do not exist..."
     TRUSTED_MODES=("trusted" "untrusted")

@@ -31,5 +31,5 @@ sed -i "s=<scalefactor>1</scalefactor>=<scalefactor>$NUM_WAREHOUSES</scalefactor
 for i in $(seq 1 $NUM_RUNS)
 do
     echo "Run $i of $NUM_RUNS"
-    java -jar benchbase.jar -b tpcc -c config/postgres/sample_tpcc_config.xml --create=true --load=true --execute=true
+    java -jar benchbase.jar -b tpcc -c config/postgres/sample_tpcc_config.xml --clear=true --create=true --load=true --execute=true
 done
