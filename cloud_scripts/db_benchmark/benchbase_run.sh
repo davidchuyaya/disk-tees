@@ -32,8 +32,8 @@ sed -i "s=<scalefactor>1</scalefactor>=<scalefactor>$NUM_WAREHOUSES</scalefactor
 # Modify terminals
 sed -i "s=<terminals>1</terminals>=<terminals>$NUM_TERMINALS</terminals>=g" config/postgres/sample_tpcc_config.xml
 # Turn wait times back on
-sed -i "s=<!--<preExecutionWait>\(.*\)</preExecutionWait>-->=<preExecutionWait>\1</preExecutionWait>=" config/postgres/sample_tpcc_config.xml
-sed -i "s=<!--<postExecutionWait>\(.*\)</postExecutionWait>-->=<postExecutionWait>\1</postExecutionWait>=" config/postgres/sample_tpcc_config.xml
+# sed -i "s=<!--<preExecutionWait>\(.*\)</preExecutionWait>-->=<preExecutionWait>\1</preExecutionWait>=" config/postgres/sample_tpcc_config.xml
+# sed -i "s=<!--<postExecutionWait>\(.*\)</postExecutionWait>-->=<postExecutionWait>\1</postExecutionWait>=" config/postgres/sample_tpcc_config.xml
 for i in $(seq 1 $NUM_RUNS)
 do
     echo "Run $i of $NUM_RUNS"
