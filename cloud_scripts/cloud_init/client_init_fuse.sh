@@ -12,6 +12,8 @@ PROJECT_DIR=/home/$USERNAME/disk-tees
 if [ ! -d $PROJECT_DIR ]; then
     cd /home/$USERNAME
     git clone https://github.com/davidchuyaya/disk-tees.git
+    cd $PROJECT_DIR
+    ./install.sh
 fi
 
 NAME=client${ID}
