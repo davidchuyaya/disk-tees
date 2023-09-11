@@ -21,8 +21,8 @@ while getopts 'i:u:' flag; do
 done
 
 NUM_RUNS=3
-NUM_WAREHOUSES=50
-NUM_TERMINALS_ARRAY=(1 5 10 20 50 100 150 200)
+NUM_WAREHOUSES=20
+NUM_TERMINALS_ARRAY=(1 5 10 20 50 100)
 
 cd /home/$USERNAME/benchbase/target/benchbase-postgres
 # Modify IP address in config
