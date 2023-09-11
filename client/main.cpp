@@ -80,7 +80,8 @@ int main(int argc, char* argv[]) {
     // 4. Connect to all replicas
     std::cout << "Connecting to replicas" << std::endl;
     // Note: Quorum = 1 if f = 1, because we (the client) is always live and gives an implicit +1.
-    ClientFuse fuse(config.network, r, path + "/storage", 1, replicas);
+    int quorum = 1;
+    ClientFuse fuse(config.network, r, path + "/storage", quorum, replicas);
     TLS<replicaMsg> replicaTLS(config.id, name, Client, allReplicasConf, path,
         [&](const replicaMsg& payload, const std::string& addr) {
             fuse.sender = addr;
