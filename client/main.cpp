@@ -68,7 +68,6 @@ int main(int argc, char* argv[]) {
 
     // 2. Find the replica addresses for the current config
     addresses replicas = NetworkConfig::configToAddrs(Replica, replicaConf);
-    int quorum = replicaConf.size() / 2 + 1;
     std::string name = "client" + std::to_string(config.id);
 
     // 3. Find all replicas in past or present configs, removing duplicates
@@ -80,7 +79,8 @@ int main(int argc, char* argv[]) {
     
     // 4. Connect to all replicas
     std::cout << "Connecting to replicas" << std::endl;
-    ClientFuse fuse(config.network, r, path + "/storage", quorum, replicas);
+    // Note: Quorum = 1 if f = 1, because we (the client) is always live and gives an implicit +1.
+    ClientFuse fuse(config.network, r, path + "/storage", 1, replicas);
     TLS<replicaMsg> replicaTLS(config.id, name, Client, allReplicasConf, path,
         [&](const replicaMsg& payload, const std::string& addr) {
             fuse.sender = addr;

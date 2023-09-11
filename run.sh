@@ -32,8 +32,6 @@ while getopts 't:p:n:w:m:' flag; do
 done
 
 RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${POSTGRES_MODE}
-NUM_REPLICAS=3
-NUM_CCF_NODES=3
 CCF_PORT=10200
 
 echo "Fetching VM IP addresses, if necessary, assuming launch.sh has been run..."
@@ -44,35 +42,48 @@ if [ ! -f $VMS_JSON ]; then
         --show-details > $VMS_JSON
 fi
 
-echo "Creating JSONs for CCF and replicas, if necessary. The 1st VM will always be the client, the 2nd the benchmark process, then CCF and replicas."
+# Assign IP addresses to variables
+BENCHBASE_PUBLIC_IP=$(jq -r '.[] | select(.name=="benchbase") | .publicIps' $VMS_JSON)
+CLIENT_PUBLIC_IP=$(jq -r '.[] | select(.name=="client_and_replicas") | .publicIps' $VMS_JSON)
+CLIENT_PRIVATE_IP=$(jq -r '.[] | select(.name=="client_and_replicas") | .privateIps' $VMS_JSON)
+if [ -z "$CLIENT_PUBLIC_IP" ]
+then
+    # Must've launched client with replicas. Gather all IPs
+    CLIENT_PUBLIC_IP=$(jq -r '.[] | select(.name=="client_and_replicas0") | .publicIps' $VMS_JSON)
+    CLIENT_PRIVATE_IP=$(jq -r '.[] | select(.name=="client_and_replicas0") | .privateIps' $VMS_JSON)
+    readarray -t REPLICA_PUBLIC_IPS < <(jq -r '.[] | select(.name | test("client_and_replicas[1-9]")) | .publicIps' $VMS_JSON)
+    readarray -t REPLICA_PRIVATE_IPS < <(jq -r '.[] | select(.name | test("client_and_replicas[1-9]")) | .privateIps' $VMS_JSON)
+fi
+readarray -t CCF_PUBLIC_IPS < <(jq -r '.[] | select(.name | test("ccf[0-9]")) | .publicIps' $VMS_JSON)
+readarray -t CCF_PRIVATE_IPS < <(jq -r '.[] | select(.name | test("ccf[0-9]")) | .privateIps' $VMS_JSON)
+
+echo "Creating JSONs for CCF and replicas, if necessary."
 CCF_JSON=build/ccf.json
 REPLICAS_JSON=build/replicas.json
-readarray -t PRIVATE_IPS < <(jq -r -c '.[].privateIps' $VMS_JSON)
-if [ ! -f $CCF_JSON ] || [ ! -f $REPLICAS_JSON ]
+if [ ! -f $CCF_JSON ]
 then
     echo '[' > $CCF_JSON
-    echo '[' > $REPLICAS_JSON
-    for i in "${!PRIVATE_IPS[@]}"
+    for i in "${!CCF_PRIVATE_IPS[@]}"
     do
-        if (( $i >= 2 )) && (( $i < 2 + $NUM_CCF_NODES ))
-        then
-            ID=$(($i - 2))
-            echo '{"ip": "'${PRIVATE_IPS[$i]}:$CCF_PORT'", "id": '$ID'}' >> $CCF_JSON
-        elif (( $i >= 2 + $NUM_CCF_NODES ))
-        then
-            ID=$(($i - 2 - $NUM_CCF_NODES))
-            echo '{"ip": "'${PRIVATE_IPS[$i]}'", "id": '$ID'}' >> $REPLICAS_JSON
-        fi
-
-        if (( $i > 2 )) && (( $i < 2 + $NUM_CCF_NODES ))
+        if (( $i > 0 ))
         then
             echo ',' >> $CCF_JSON
-        elif (( $i > 2 + $NUM_CCF_NODES ))
+        fi
+        echo '{"ip": "'${CCF_PRIVATE_IPS[$i]}:$CCF_PORT'", "id": '$i'}' >> $CCF_JSON
+    done
+    echo ']' >> $CCF_JSON
+fi
+if [ ! -f $REPLICAS_JSON ]
+then
+    echo '[' > $REPLICAS_JSON
+    for i in "${!REPLICA_PRIVATE_IPS[@]}"
+    do
+        if (( $i > 0 ))
         then
             echo ',' >> $REPLICAS_JSON
         fi
+        echo '{"ip": "'${REPLICA_PRIVATE_IPS[$i]}'", "id": '$i'}' >> $REPLICAS_JSON
     done
-    echo ']' >> $CCF_JSON
     echo ']' >> $REPLICAS_JSON
 fi
 
@@ -90,7 +101,6 @@ SERVICE_CERT=$CERT_DIR/service_cert.pem
 USER_CERT=$CERT_DIR/user0_cert.pem
 USER_KEY=$CERT_DIR/user0_privk.pem
 
-readarray -t PUBLIC_IPS < <(jq -r -c '.[].publicIps' $VMS_JSON)
 case $NODE_TYPE in
     "client")
         CLIENT_DIR=$BUILD_DIR/client0
@@ -112,7 +122,7 @@ case $NODE_TYPE in
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n WAIT_SECS -v $WAIT_SECS
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
-        ssh -o StrictHostKeyChecking=no $USERNAME@${PUBLIC_IPS[0]} "bash -s" -- < $NEW_INIT_SCRIPT
+        ssh -o StrictHostKeyChecking=no $USERNAME@$CLIENT_PUBLIC_IP "bash -s" -- < $NEW_INIT_SCRIPT
         ;;
     "benchbase")
         BENCHBASE_DIR=$BUILD_DIR/benchbase
@@ -120,12 +130,12 @@ case $NODE_TYPE in
         NEW_INIT_SCRIPT=$BENCHBASE_DIR/benchbase_init.sh
         cp $BENCHBASE_INIT_SCRIPT $NEW_INIT_SCRIPT
         # Attach variables
-        $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n CLIENT_IP -v ${PRIVATE_IPS[0]}
+        $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n CLIENT_IP -v $CLIENT_PRIVATE_IP
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
-        ssh -o StrictHostKeyChecking=no $USERNAME@${PUBLIC_IPS[1]} "bash -s" -- < $NEW_INIT_SCRIPT
+        ssh -o StrictHostKeyChecking=no $BENCHBASE_PUBLIC_IP "bash -s" -- < $NEW_INIT_SCRIPT
         # Download results
         echo "Downloading results to $BENCHBASE_DIR/results..."
-        scp -r $USERNAME@${PUBLIC_IPS[1]}:/home/$USERNAME/benchbase/target/benchbase-postgres/results $BENCHBASE_DIR
+        scp -r $USERNAME@$BENCHBASE_PUBLIC_IP:/home/$USERNAME/benchbase/target/benchbase-postgres/results $BENCHBASE_DIR
         ;;
     "ccf")
         # Create ansible inventory file, nodes argument for sandbox.sh
@@ -133,13 +143,12 @@ case $NODE_TYPE in
         CCF_ANSIBLE_INVENTORY=build/ccf_ansible_inventory
         CCF_ADDRS=""
         echo '[all]' > $CCF_ANSIBLE_INVENTORY
-        for i in "${!PUBLIC_IPS[@]}"
+        for i in "${!CCF_PUBLIC_IPS[@]}"
         do
-            if (( $i >= 2 )) && (( $i < 2 + $NUM_CCF_NODES ))
-            then
-                echo ${PUBLIC_IPS[$i]} >> $CCF_ANSIBLE_INVENTORY
-                CCF_ADDRS+="--node ssh://"${PRIVATE_IPS[$i]}:$CCF_PORT,${PUBLIC_IPS[$i]}:$CCF_PORT" "
-            fi
+            CCF_PUBLIC_IP=${CCF_PUBLIC_IPS[$i]}
+            CCF_PRIVATE_IP=${CCF_PRIVATE_IPS[$i]}
+            echo $CCF_PUBLIC_IP >> $CCF_ANSIBLE_INVENTORY
+            CCF_ADDRS+="--node ssh://"$CCF_PRIVATE_IP:$CCF_PORT,$CCF_PUBLIC_IP:$CCF_PORT" "
         done
         # Install CCF dependencies
         ansible-playbook $PROJECT_DIR/cloud_scripts/ccf-deps.yml -i $CCF_ANSIBLE_INVENTORY
@@ -151,7 +160,7 @@ case $NODE_TYPE in
             --js-app-bundle ~/disk-tees/ccf $CCF_ADDRS # List of (local://|ssh://)hostname:port[,pub_hostnames:pub_port]
         ;;
     "replicas")  
-        for ((i = 0; i < $NUM_REPLICAS; i++))
+        for i in "${!REPLICA_PUBLIC_IPS[@]}"
         do
             REPLICA_DIR=$BUILD_DIR/replica$i
             mkdir -p $REPLICA_DIR
@@ -166,9 +175,8 @@ case $NODE_TYPE in
             $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v $i
             $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
             $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
-            # Don't stay connected to SSH, so we can launch multiple. See: https://unix.stackexchange.com/a/412586/386668
-            INDEX=$(($i + 2 + $NUM_CCF_NODES))
-            ssh -o StrictHostKeyChecking=no $USERNAME@${PUBLIC_IPS[$INDEX]} "bash -s" -- < $NEW_INIT_SCRIPT
+            # TODO: Figure out how to launch multiple without waiting for previous to finish
+            ssh -o StrictHostKeyChecking=no $USERNAME@${REPLICA_PUBLIC_IPS[$i]} "bash -s" -- < $NEW_INIT_SCRIPT
         done
         echo "Finished starting replicas"
         ;;

@@ -32,7 +32,7 @@ done
 # Set variables
 SUBSCRIPTION="d8583813-7f3b-43a6-85ac-bac7e4751e5a" # Azure subscription internal to Microsoft Research. Change this to your own subscription.
 RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${POSTGRES_MODE}
-NUM_REPLICAS=3
+NUM_REPLICAS=2
 NUM_CCF_NODES=3
 CCF_PORT=10200
 
@@ -150,21 +150,18 @@ case $TRUSTED_MODE in
   "trusted")
     LOCATION="northeurope"
     ZONE=3
-    VM_SIZE="Standard_DC8as_v5"
-    IMAGE="Canonical:0001-com-ubuntu-confidential-vm-focal:20_04-lts-cvm:latest"
-    TRUSTED_PARAMS="--security-type ConfidentialVM
-                    --os-disk-security-encryption-type VMGuestStateOnly
-                    --enable-vtpm";;
+    VM_SIZE="Standard_DC16as_v5"
+    CCF_VM_SIZE="Standard_DC2as_v5";; # Use as few cores as possible for CCF since it's not on the critical path
   "untrusted")
     LOCATION="swedencentral"
     ZONE=2
-    VM_SIZE="Standard_D8as_v5"
-    IMAGE="Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest";;
+    VM_SIZE="Standard_D16as_v5";;
   *)
     echo "Invalid trusted mode selected."
     print_usage
     exit 1;;
 esac
+BENCHBASE_VM_SIZE="Standard_D32_v5" # 32 cores for benchbase, doesn't need to be confidential
 
 # Create a resource group
 az group create \
@@ -178,35 +175,65 @@ az ppg create \
   --name ${RESOURCE_GROUP}_ppg \
   --location $LOCATION \
   --zone $ZONE \
-  --intent-vm-sizes $VM_SIZE
+  --intent-vm-sizes $VM_SIZE $CCF_VM_SIZE $BENCHBASE_VM_SIZE
 
-case $POSTGRES_MODE in
-  "rollbaccine")
-    NUM_VMS=$(($NUM_REPLICAS + $NUM_CCF_NODES + 2));;
-  *) # 2 = client + benchbase
-    NUM_VMS=2;;
-esac
+# Parameters: $1 = name of node (ccf, benchbase, or client_and_replicas)
+create_vms() {
+  UNTRUSTED_IMAGE="Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
+  TRUSTED_IMAGE="Canonical:0001-com-ubuntu-confidential-vm-focal:20_04-lts-cvm:latest"
+  TRUSTED_PARAMS="--security-type ConfidentialVM
+                    --os-disk-security-encryption-type VMGuestStateOnly
+                    --enable-vtpm"
+  case $1 in
+    "ccf")
+      IMAGE=$TRUSTED_IMAGE
+      SIZE=$CCF_VM_SIZE
+      PARAMS=$TRUSTED_PARAMS" --count "$NUM_CCF_NODES;;
+    "benchbase")
+      IMAGE=$UNTRUSTED_IMAGE
+      SIZE=$BENCHBASE_VM_SIZE;;
+    *)
+      if [[ $TRUSTED_MODE == "trusted" ]]
+      then
+        IMAGE=$TRUSTED_IMAGE
+        if [[ $POSTGRES_MODE == "rollbaccine" ]]
+        then # VMs for replicas + client
+          NUM_REPLICAS_AND_CLIENT=$(($NUM_REPLICAS + 1))
+          PARAMS=$TRUSTED_PARAMS" --data-disk-sizes-gb 32 --count "$NUM_REPLICAS_AND_CLIENT
+        else # VMs for just client
+          PARAMS=$TRUSTED_PARAMS" --data-disk-sizes-gb 32"
+        fi
+      else
+        IMAGE=$UNTRUSTED_IMAGE
+      fi
+      SIZE=$VM_SIZE;;
+  esac
 
-az vm create \
-  --resource-group $RESOURCE_GROUP \
-  --name $POSTGRES_MODE \
-  --count $NUM_VMS \
-  --admin-username $USERNAME \
-  --generate-ssh-keys \
-  --public-ip-sku Standard \
-  --nic-delete-option Delete \
-  --os-disk-delete-option Delete \
-  --data-disk-delete-option Delete \
-  --ppg ${RESOURCE_GROUP}_ppg \
-  --location $LOCATION \
-  --zone $ZONE \
-  --size $VM_SIZE \
-  --data-disk-sizes-gb 32 \
-  --image $IMAGE $TRUSTED_PARAMS
+  # Note: Turn accelerated networking off because it's available for VMs but not CVMs
+  az vm create \
+    --resource-group $RESOURCE_GROUP \
+    --name $1 \
+    --admin-username $USERNAME \
+    --generate-ssh-keys \
+    --public-ip-sku Standard \
+    --nic-delete-option Delete \
+    --os-disk-delete-option Delete \
+    --data-disk-delete-option Delete \
+    --accelerated-networking false \
+    --ppg ${RESOURCE_GROUP}_ppg \
+    --location $LOCATION \
+    --zone $ZONE \
+    --size $SIZE \
+    --image $IMAGE $PARAMS
+}
+
+create_vms client_and_replicas
+create_vms benchbase
 
 # Allow CCF nodes to listen to WSL on $CCF_PORT
 if [[ $POSTGRES_MODE == "rollbaccine" ]]
 then
+  create_vms ccf
   az network nsg rule create \
     --resource-group $RESOURCE_GROUP \
     --nsg-name ${POSTGRES_MODE}NSG \
