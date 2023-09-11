@@ -184,6 +184,7 @@ create_vms() {
   TRUSTED_PARAMS="--security-type ConfidentialVM
                     --os-disk-security-encryption-type VMGuestStateOnly
                     --enable-vtpm"
+  PARAMS="" # Reset params
   case $1 in
     "ccf")
       IMAGE=$TRUSTED_IMAGE
