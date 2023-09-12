@@ -2,4 +2,4 @@
 If not specified, each TMPFS is allocated 8GB.
 
 ### TPC-C config
-Uses the [default from Benchbase](https://github.com/cmu-db/benchbase/blob/main/config/postgres/sample_tpcc_config.xml), with 10 warehouses.
+See [tpcc_config.xml](../cloud_scripts/db_benchmark/tpcc_config.xml), with 20 warehouses and 10 terminals, 30 seconds of warmup and 60 seconds run time.

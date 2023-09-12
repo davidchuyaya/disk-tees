@@ -14,3 +14,6 @@ sudo apt install ansible -y
 
 cloud_scripts/benchbase_install.sh -t local
 cloud_scripts/postgres_install.sh -t local
+
+# Graphing experiments
+python -m pip install -U matplotlib
