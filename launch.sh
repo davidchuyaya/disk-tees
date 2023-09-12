@@ -237,7 +237,7 @@ then
   create_vms ccf
   az network nsg rule create \
     --resource-group $RESOURCE_GROUP \
-    --nsg-name ${POSTGRES_MODE}NSG \
+    --nsg-name ccfNSG \
     --name allow_ccf \
     --priority 1010 \
     --destination-port-ranges $CCF_PORT

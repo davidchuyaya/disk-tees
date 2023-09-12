@@ -1,7 +1,7 @@
 #!/bin/bash
 print_usage() {
     echo "Usage: $0 -f <file> -i <input bash> -o <output bash> -d <directory>"
-    echo "Prepends the file to the top of the bash script and adds a line in that script to output the file to the specified directory"
+    echo "Prepends the file to the bash script after \"# FILE INSERT POINT\" and adds a line in that script to output the file to the specified directory"
 }
 
 if (( $# == 0 )); then
@@ -30,8 +30,8 @@ RECREATE_FILE='echo $'${FILE_NAME}' | base64 -d > '${DIR}/${FILE_NAME_WITH_EXTEN
 # Insert the variable and line
 if [ $INPUT = $OUTPUT ]
 then
-  sed -i "2i ${FILE_NAME}=${FILE64} \n ${RECREATE_FILE}" $INPUT
+  sed -i "\*# FILE INSERT POINT*a ${FILE_NAME}=${FILE64} \n ${RECREATE_FILE}" $INPUT
 else
-  sed "2i ${FILE_NAME}=${FILE64} \n ${RECREATE_FILE}" $INPUT > $OUTPUT
+  sed "\*# FILE INSERT POINT*a ${FILE_NAME}=${FILE64} \n ${RECREATE_FILE}" $INPUT > $OUTPUT
   chmod +x $OUTPUT
 fi

@@ -23,6 +23,8 @@ BUILD_DIR=$PROJECT_DIR/build/$NAME
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 
+# FILE INSERT POINT
+
 # Create certificates and send them to CCF
 $PROJECT_DIR/cloud_scripts/create_cert.sh -t $TRUSTED_MODE -n $NAME
 CCF_ADDR=$(jq -r '.[0].ip' ${BUILD_DIR}/ccf.json)

@@ -2,7 +2,7 @@
 # 
 # Install and run postgres, writing to tmpfs, forwarding writes to all replicas
 #
-# Assumes thae following files will be inserted via attach_file.sh:
+# Assumes the following files will be inserted via attach_file.sh:
 #   ccf.json
 #   replicas.json
 # Assumes the following variables will be inserted via attach_var.sh:
@@ -23,6 +23,8 @@ fi
 NAME=client${ID}
 BUILD_DIR=$PROJECT_DIR/build/$NAME
 mkdir -p $BUILD_DIR
+
+# FILE INSERT POINT
 
 # Create certificates and send them to CCF
 cd $BUILD_DIR
@@ -50,8 +52,8 @@ sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $ZIPPED_DIR
 DIR=${BUILD_DIR}/shim
 mkdir -p $DIR
 
-# Start background process to make sure FUSE checks for messages periodically
-$PROJECT_DIR/cloud_scripts/fuse_waker.sh -n $NAME -u $USERNAME &
+# Start background process to make sure FUSE checks for messages periodically. Don't output: https://stackoverflow.com/a/9190205/4028758
+nohup $PROJECT_DIR/cloud_scripts/fuse_waker.sh -n $NAME -u $USERNAME &
 
 # Make tee_fuse and mount it on $DIR
 cd $PROJECT_DIR

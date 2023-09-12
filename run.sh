@@ -59,32 +59,32 @@ readarray -t CCF_PRIVATE_IPS < <(jq -r '.[] | select(.name | test("ccf[0-9]")) |
 
 echo "Creating JSONs for CCF and replicas, if necessary."
 CCF_JSON=build/ccf.json
-REPLICAS_JSON=build/replicas.json
+REPLICA_JSON=build/replicas.json
 if [ ! -f $CCF_JSON ]
 then
     echo '[' > $CCF_JSON
-    for i in "${!CCF_PRIVATE_IPS[@]}"
+    for i in "${!CCF_PUBLIC_IPS[@]}"
     do
         if (( $i > 0 ))
         then
             echo ',' >> $CCF_JSON
         fi
-        echo '{"ip": "'${CCF_PRIVATE_IPS[$i]}:$CCF_PORT'", "id": '$i'}' >> $CCF_JSON
+        echo '{"ip": "'${CCF_PUBLIC_IPS[$i]}:$CCF_PORT'", "id": '$i'}' >> $CCF_JSON
     done
     echo ']' >> $CCF_JSON
 fi
-if [ ! -f $REPLICAS_JSON ]
+if [ ! -f $REPLICA_JSON ]
 then
-    echo '[' > $REPLICAS_JSON
+    echo '[' > $REPLICA_JSON
     for i in "${!REPLICA_PRIVATE_IPS[@]}"
     do
         if (( $i > 0 ))
         then
-            echo ',' >> $REPLICAS_JSON
+            echo ',' >> $REPLICA_JSON
         fi
-        echo '{"ip": "'${REPLICA_PRIVATE_IPS[$i]}'", "id": '$i'}' >> $REPLICAS_JSON
+        echo '{"ip": "'${REPLICA_PRIVATE_IPS[$i]}'", "id": '$i'}' >> $REPLICA_JSON
     done
-    echo ']' >> $REPLICAS_JSON
+    echo ']' >> $REPLICA_JSON
 fi
 
 echo "Running $NODE_TYPE..."
@@ -175,8 +175,10 @@ case $NODE_TYPE in
             $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n ID -v $i
             $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
             $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
-            # TODO: Figure out how to launch multiple without waiting for previous to finish
-            ssh -o StrictHostKeyChecking=no $USERNAME@${REPLICA_PUBLIC_IPS[$i]} "bash -s" -- < $NEW_INIT_SCRIPT
+            echo "Starting replica at ${REPLICA_PUBLIC_IPS[$i]}..."
+            ssh -o StrictHostKeyChecking=no $USERNAME@${REPLICA_PUBLIC_IPS[$i]} "bash -s > /home/$USERNAME/out.log 2>&1" -- < $NEW_INIT_SCRIPT &
+            sleep 5 # Wait until SSH connects
+            kill $!
         done
         echo "Finished starting replicas"
         ;;

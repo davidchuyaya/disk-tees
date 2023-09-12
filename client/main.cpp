@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
     // 1. Send MatchA to CCF, wait for MatchB
     std::cout << "Beginning matchmaking phase" << std::endl;
     CCFNetwork ccfNetwork(path, ccfConf);
-    matchB matchmakeResult = matchmake(ccfNetwork, config.id, ccfConf);
+    matchB matchmakeResult = matchmake(ccfNetwork, config.id, replicaConf);
     ballot r = matchmakeResult.r;
     std::cout << "Matchmaking complete" << std::endl;
 
