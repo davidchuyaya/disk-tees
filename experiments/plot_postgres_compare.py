@@ -26,10 +26,9 @@ def main():
     [throughput_trusted_fuse, latency_trusted_fuse] = get_throughput_latency("trusted_fuse/*.summary.json")
     [throughput_trusted_rollbaccine, latency_trusted_rollbaccine] = get_throughput_latency("trusted_rollbaccine/*.summary.json")
 
-    fig, ax = plt.subplots(layout="constrained")
+    fig, ax = plt.subplots(1, 1, figsize=(8, 3))
     bar_types = ("VM", "CVM")
     x = np.arange(len(bar_types))
-    width = 0.2
     multiplier = 0
 
     if mode == "latency":
@@ -50,11 +49,12 @@ def main():
         }
         ax.set_ylabel("Goodput (requests/second)")
         legend_loc = "right"
-    
+
+    width = 1 / (len(weight_counts) + 1)
     for label, weight_count in weight_counts.items():
         offset = width * multiplier
         rects = ax.bar(x + offset, weight_count, width, label=label)
-        ax.bar_label(rects, padding=3)
+        ax.bar_label(rects, fmt="%d", label_type="center")
         multiplier += 1
 
     ax.set_xticks(x + width, bar_types)
