@@ -361,7 +361,7 @@ void ReplicaFuse::operator()(const p2a& msg) {
 void ReplicaFuse::bufferMsg(const clientMsg& msg, const std::string& addr) {
     sender = addr;
 
-    std::cout << "Received message: " << getSeq(msg) << ", written: " << written << ", type: " << getClientMsgType(msg) << " from " << sender << ", is client: " << (sender == client) << std::endl;
+    // std::cout << "Received message: " << getSeq(msg) << ", written: " << written << ", type: " << getClientMsgType(msg) << " from " << sender << ", is client: " << (sender == client) << std::endl;
 
     if (getBallot(msg) < highestBallot) {
         std::cout << "Received message with ballot " << getBallot(msg) << " when highestBallot is " << highestBallot << std::endl;
