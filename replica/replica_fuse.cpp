@@ -361,7 +361,7 @@ void ReplicaFuse::operator()(const p2a& msg) {
 void ReplicaFuse::bufferMsg(const clientMsg& msg, const std::string& addr) {
     sender = addr;
 
-    // std::cout << "Received message: " << getSeq(msg) << ", written: " << written << ", type: " << getClientMsgType(msg) << " from " << sender << ", is client: " << (sender == client) << std::endl;
+    std::cout << "Received message: " << getSeq(msg) << ", written: " << written << ", type: " << getClientMsgType(msg) << " from " << sender << ", is client: " << (sender == client) << std::endl;
 
     if (getBallot(msg) < highestBallot) {
         std::cout << "Received message with ballot " << getBallot(msg) << " when highestBallot is " << highestBallot << std::endl;
@@ -371,12 +371,6 @@ void ReplicaFuse::bufferMsg(const clientMsg& msg, const std::string& addr) {
     int seq;
     switch (getClientMsgType(msg)) {
         case Write:
-            // Broadcast to other replicas
-            if (sender == client) {
-                // std::cout << "Broadcasting message to replicas" << std::endl;
-                clientTLS->broadcastExcept<clientMsg>(msg, client);
-                // std::cout << "Completed broadcast to replicas" << std::endl;
-            }
             // Don't buffer if message can be immediately processed
             seq = getSeq(msg);
             if (seq == written + 1 && ballotIsValid(getBallot(msg))) {
