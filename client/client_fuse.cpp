@@ -17,9 +17,9 @@
 // If defined, will send messages to the replicas.
 #define NETWORK
 
-ClientFuse::ClientFuse(const bool networkParam, const ballot& ballotParam, const std::string& redirectPointParam, const int quorumParam,
- const addresses& replicasParam) {
+ClientFuse::ClientFuse(const bool networkParam, const bool metricsOnParam, const ballot& ballotParam, const std::string& redirectPointParam, const int quorumParam, const addresses& replicasParam) {
 	network = networkParam;
+	metricsOn = metricsOnParam;
 	r = ballotParam;
 	redirectPoint = redirectPointParam;
 	quorum = quorumParam;
@@ -217,8 +217,18 @@ int ClientFuse::client_readdir(const char* path, void *buf, fuse_fill_dir_t fill
 
 	// Check network (non-blocking).
 	// NOTE: If the client is not performing writes and a new replica wants to reconfigure, because FUSE controls the event loop (not us), we can't receive messages. As a workaround, fuse_waker.sh performs "ls" on the FUSE directory every couple of seconds, which triggers this function and allows us to check incoming messages.
-	if (network)
+	if (network) {
 		replicaTLS->runEventLoopOnce(0);
+		if (metricsOn) {
+			if (meanFsyncWaitMicroSec != -1)
+				std::cout << "Mean fsync wait time: " << meanFsyncWaitMicroSec << "us" << std::endl;
+			if (meanWriteMicroSec != -1)
+				std::cout << "Mean write time: " << meanWriteMicroSec << "us" << std::endl;
+
+			meanFsyncWaitMicroSec = -1;
+			meanWriteMicroSec = -1;
+		}
+	}
 
 	return 0;
 }
@@ -582,6 +592,11 @@ int ClientFuse::client_write_buf(const char *path, fuse_bufvec *buf, off_t offse
 	dst.buf[0].pos = offset;
 
 	if (network) {
+		// Calculate how long writing took if metricsOn
+		std::chrono::steady_clock::time_point start;
+		if (metricsOn)
+			start = now();
+
 		// 1. Copy memory from buffer into mem
 		char* bufStart = (char*) buf->buf[buf->idx].mem + buf->off;
 		// TODO: This is probably the critical point of the code, and we're doing 2 copies (1 into the vector, 1 after serializing).
@@ -597,6 +612,14 @@ int ClientFuse::client_write_buf(const char *path, fuse_bufvec *buf, off_t offse
 			.buf = mem,
 			.fi = make_lite(fi)
 		}, replicas);
+
+		if (metricsOn) {
+			int elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now() - start).count();
+			if (meanWriteMicroSec == -1)
+				meanWriteMicroSec = elapsed;
+			else
+				meanWriteMicroSec = (meanWriteMicroSec + elapsed) / 2;
+		}
 	}
 
 	return fuse_buf_copy(&dst, buf, FUSE_BUF_SPLICE_NONBLOCK);
@@ -635,12 +658,25 @@ int ClientFuse::client_fsync(const char *path, int isdatasync, fuse_file_info *f
 			.fi = make_lite(fi)
 		}, replicas);
 
-		// std::cout << "Waiting on fsync with written: " << written << std::endl;
+		// Calculate how long waiting for fsync took if metricsOn
+		std::chrono::steady_clock::time_point start;
+		if (metricsOn)
+			start = now();
+
+        // std::cout << "Waiting on fsync with written: " << written << std::endl;
         // block until fsync is acknowledged by quorum
 		while (replicasCommitted < written) {
 			replicaTLS->runEventLoopOnce(-1);
 		}
 		// std::cout << "Completed fsync with written: " << written << std::endl;
+
+		if (metricsOn) {
+			int elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now() - start).count();
+			if (meanFsyncWaitMicroSec == -1)
+				meanFsyncWaitMicroSec = elapsed;
+			else
+				meanFsyncWaitMicroSec = (meanFsyncWaitMicroSec + elapsed) / 2;
+		}
 	}
 
     return 0;
@@ -731,4 +767,8 @@ fuse_file_info_lite ClientFuse::make_lite(fuse_file_info *fi) {
 		.flags = fi->flags,
 		.fh = fi->fh	
 	};
+}
+
+std::chrono::steady_clock::time_point ClientFuse::now() {
+	return std::chrono::steady_clock::now();
 }

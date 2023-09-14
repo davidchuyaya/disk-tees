@@ -1,6 +1,7 @@
 #pragma once
 #include <map>
 #include <set>
+#include <chrono>
 #include "Fuse.hpp"
 #include "Fuse.cpp"
 #include "../shared/tls.hpp"
@@ -13,7 +14,7 @@
 class ClientFuse : public Fusepp::Fuse<ClientFuse>
 {
 public:
-    ClientFuse(const bool network, const ballot& r, const std::string& redirectPoint, const int quorum, const addresses& replicas);
+    ClientFuse(const bool network, const bool metricsOn, const ballot& r, const std::string& redirectPoint, const int quorum, const addresses& replicas);
     void addTLS(TLS<replicaMsg> *tls);
     bool p1bQuorum(const std::vector<networkConfig>& configs);
     p1b highestRankingP1b();
@@ -83,6 +84,7 @@ private:
     // inline static: See https://stackoverflow.com/a/62915890/4028758
     // 1. Constants
     inline static bool network;
+    inline static bool metricsOn;
     inline static int quorum;
     inline static TLS<replicaMsg> *replicaTLS;
     inline static std::string redirectPoint; // Directory to redirect writes to. Since we're passing through all disk operations, this is necessary to prevent retriggering FUSE in the same directory
@@ -91,7 +93,10 @@ private:
     inline static std::map<int, clientMsg> uncommittedWrites = {}; // Key = sequence number
     inline static std::map<int, int> replicaWritten = {}; // Map from ID to largest sequence number for each replica
     inline static addresses replicas;
-    // 3. State only relevant during specific phases of the protocol
+    // 3. Metrics (only collected when metricsOn = true)
+    inline static int meanFsyncWaitMicroSec = -1;
+    inline static int meanWriteMicroSec = -1;
     
     static fuse_file_info_lite make_lite(fuse_file_info *fi);
+    static std::chrono::steady_clock::time_point now();
 };

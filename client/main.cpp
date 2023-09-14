@@ -12,6 +12,7 @@
 static struct config {
     int id;
     bool network;
+    bool metricsOn;
     const char* trustedMode;
     const char* username;
 } config;
@@ -23,6 +24,7 @@ static const struct fuse_opt config_spec[] = {
     OPTION("-t %s", trustedMode),
     OPTION("-u %s", username),
     OPTION("-n", network),
+    OPTION("-m", metricsOn),
 	FUSE_OPT_END
 };
 
@@ -51,7 +53,7 @@ int main(int argc, char* argv[]) {
 
     // No replicas
     if (!config.network) {
-        ClientFuse fuse(config.network, ballot {0, 0, 0}, path + "/storage", 0, {});
+        ClientFuse fuse(config.network, config.metricsOn, ballot {0, 0, 0}, path + "/storage", 0, {});
         return fuse.run(args.argc, args.argv);
     }
     // Otherwise, begin leader election
@@ -81,7 +83,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Connecting to replicas" << std::endl;
     // Note: Quorum = 1 if f = 1, because we (the client) is always live and gives an implicit +1.
     int quorum = 1;
-    ClientFuse fuse(config.network, r, path + "/storage", quorum, replicas);
+    ClientFuse fuse(config.network, config.metricsOn, r, path + "/storage", quorum, replicas);
     TLS<replicaMsg> replicaTLS(config.id, name, Client, allReplicasConf, path,
         [&](const replicaMsg& payload, const std::string& addr) {
             fuse.sender = addr;
