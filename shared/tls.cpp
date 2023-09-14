@@ -77,6 +77,7 @@ int TLS<RecvMsg>::acceptConnection() {
             std::cerr << "Unable to accept" << std::endl;
         return -1;
     }
+    disableNaglesAlgorithm(client);
 
     std::cout << "Client TCP connection accepted" << std::endl;
 
