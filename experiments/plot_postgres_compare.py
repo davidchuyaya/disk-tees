@@ -34,18 +34,18 @@ def main():
     if mode == "latency":
         weight_counts = {
             "tmpfs": np.array([latency_untrusted_tmpfs, latency_trusted_tmpfs]),
-            "fuse": np.array([latency_untrusted_fuse, latency_trusted_fuse]),
+            "FUSE": np.array([latency_untrusted_fuse, latency_trusted_fuse]),
             "normal": np.array([latency_untrusted_normal, latency_trusted_normal]),
-            "rollbaccine": np.array([np.nan, latency_trusted_rollbaccine])
+            "Rollbaccine": np.array([np.nan, latency_trusted_rollbaccine])
         }
         ax.set_ylabel("Transaction latency (µs)")
         legend_loc = "left"
     else:
         weight_counts = {
             "tmpfs": np.array([throughput_untrusted_tmpfs, throughput_trusted_tmpfs]),
-            "fuse": np.array([throughput_untrusted_fuse, throughput_trusted_fuse]),
+            "FUSE": np.array([throughput_untrusted_fuse, throughput_trusted_fuse]),
             "normal": np.array([throughput_untrusted_normal, throughput_trusted_normal]),
-            "rollbaccine": np.array([np.nan, throughput_trusted_rollbaccine])
+            "Rollbaccine": np.array([np.nan, throughput_trusted_rollbaccine])
         }
         ax.set_ylabel("Goodput (requests/second)")
         legend_loc = "right"
