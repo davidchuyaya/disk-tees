@@ -248,11 +248,25 @@ void TLS<RecvMsg>::broadcastExcept(const SendMsg& payload, const std::string& do
 template <class RecvMsg>
 template <class SendMsg>
 void TLS<RecvMsg>::broadcast(const SendMsg& payload, const addresses& dests) {
+    // Copied from send, only serialize message once (instead of once per destination)
+    auto [sendData, out] = zpp::bits::data_out();
+    auto serializeResult = out(payload);
+    if (zpp::bits::failure(serializeResult)) {
+        std::cerr << "Unable to serialize payload, error: " << errorMessage(serializeResult) << std::endl;
+        return;
+    }
+    int dataSize = sendData.size();
+
     for (const std::string& addr : dests) {
         // send to address if the connection exists
         if (sslFromAddr.contains(addr)) {
             try {
-                send<SendMsg>(payload, addr);
+                int sock = socketFromAddr.at(addr);
+                SSL* dest = sslFromAddr.at(addr);
+                // 1. Send the size of the data
+                blockingWrite(sock, dest, &dataSize, sizeof(dataSize));
+                // 2. Send the data
+                blockingWrite(sock, dest, sendData.data(), dataSize);
             }
             catch (const std::exception& e) {
                 std::cout << "Failed to broadcast to addr: " << addr << std::endl;
