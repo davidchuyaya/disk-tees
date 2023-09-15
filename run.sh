@@ -1,12 +1,13 @@
 #!/bin/bash
 print_usage() {
-  printf "Usage: $0 -t <trusted mode> -p <postgres mode> -n <node type> [-w <wait secs before running> -m <tmpfs memory size (GB)>]\n"
+  printf "Usage: $0 -t <trusted mode> -f <file system mode> -b <benchmark type> -n <node type> [-w <wait secs before running> -m <tmpfs memory size (GB)>]\n"
   printf "Options:\n"
   printf "  -t <trusted mode>    Options: trusted, untrusted\n"
-  printf "  -p <postgres mode>   Options: normal (postgres on a single machine)\n"
-  printf "                             tmpfs (postgres on a single machine, writing to tmpfs)\n"
-  printf "                             fuse (postgres on a single machine, writing to tmpfs, redirected through fuse)\n"
-  printf "                             rollbaccine (postgres + 2f+1 disk TEEs)\n"
+  printf "  -f <file system mode>   Options: normal (write to disk)\n"
+  printf "                             tmpfs (write to tmpfs)\n"
+  printf "                             fuse (write to tmpfs, redirected through fuse)\n"
+  printf "                             rollbaccine\n"
+  printf "  -b <benchmark type>  Options: postgres, filebench\n"
   printf "  -n <node type>       Options: client, benchbase, ccf, replicas\n"
   printf "  -w <wait secs>       Expected seconds between starting the client and it winning leader election. Only relevant in rollbaccine mode\n"
   printf "  -m <tmpfs memory size (GB)>   How much memory to provide tmpfs\n"
@@ -18,11 +19,12 @@ if (( $# == 0 )); then
 fi
 
 WAIT_SECS=0
-TMPFS_MEMORY=1
-while getopts 't:p:n:w:m:' flag; do
+TMPFS_MEMORY=8
+while getopts 't:f:b:n:w:m:' flag; do
   case ${flag} in
     t) TRUSTED_MODE=${OPTARG} ;;
-    p) POSTGRES_MODE=${OPTARG} ;;
+    f) FILE_SYSTEM_MODE=${OPTARG} ;;
+    b) BENCHMARK_TYPE=${OPTARG} ;;
     n) NODE_TYPE=${OPTARG} ;;
     w) WAIT_SECS=${OPTARG} ;;
     m) TMPFS_MEMORY=${OPTARG} ;;
@@ -31,7 +33,7 @@ while getopts 't:p:n:w:m:' flag; do
   esac
 done
 
-RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${POSTGRES_MODE}
+RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${FILE_SYSTEM_MODE}_${BENCHMARK_TYPE}
 CCF_PORT=10200
 
 echo "Fetching VM IP addresses, if necessary, assuming launch.sh has been run..."
@@ -91,7 +93,7 @@ echo "Running $NODE_TYPE..."
 # Note: Most of the code below matches "local" mode in launch.sh
 USERNAME=$(whoami)
 PROJECT_DIR=/home/$USERNAME/disk-tees
-CLIENT_INIT_SCRIPT=$PROJECT_DIR/cloud_scripts/cloud_init/client_init_${POSTGRES_MODE}.sh
+CLIENT_INIT_SCRIPT=$PROJECT_DIR/cloud_scripts/cloud_init/client_init_${FILE_SYSTEM_MODE}.sh
 BENCHBASE_INIT_SCRIPT=$PROJECT_DIR/cloud_scripts/cloud_init/benchbase_init.sh
 REPLICA_INIT_SCRIPT=$PROJECT_DIR/cloud_scripts/cloud_init/replica_init.sh
 
@@ -107,7 +109,7 @@ case $NODE_TYPE in
         mkdir -p $CLIENT_DIR
         NEW_INIT_SCRIPT=$CLIENT_DIR/client_init.sh
         cp $CLIENT_INIT_SCRIPT $NEW_INIT_SCRIPT
-        if [ $POSTGRES_MODE == "rollbaccine" ]
+        if [ $FILE_SYSTEM_MODE == "rollbaccine" ]
         then
             # Attach CCF certificates and CCF JSON
             $PROJECT_DIR/cloud_scripts/attach_file.sh -f $SERVICE_CERT -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -d $CLIENT_DIR
@@ -122,6 +124,21 @@ case $NODE_TYPE in
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n WAIT_SECS -v $WAIT_SECS
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
+        # Append benchmarking scripts
+        case $BENCHMARK_TYPE in
+            "postgres")
+                echo '$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh -u $USERNAME' >> $NEW_INIT_SCRIPT
+                echo '$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR' >> $NEW_INIT_SCRIPT
+            ;;
+            "filebench")
+                echo '$PROJECT_DIR/cloud_scripts/file_benchmark/filebench_install.sh -u $USERNAME' >> $NEW_INIT_SCRIPT
+                echo '$PROJECT_DIR/cloud_scripts/file_benchmark/filebench_run.sh -u $USERNAME' >> $NEW_INIT_SCRIPT
+            ;;
+            *)
+                echo "Invalid benchmark type in run.sh."
+                print_usage
+                exit 1;;
+        esac
         ssh -o StrictHostKeyChecking=no $USERNAME@$CLIENT_PUBLIC_IP "bash -s" -- < $NEW_INIT_SCRIPT
         ;;
     "benchbase")

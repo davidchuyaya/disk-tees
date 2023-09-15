@@ -63,7 +63,5 @@ cd $BUILD_DIR
 # tee_fuse has issues if it's run too early after cmake?
 sleep 1
 $PROJECT_DIR/client/tee_fuse -i $ID -t $TRUSTED_MODE -u $USERNAME -n -m -f -s $DIR > $BUILD_DIR/log.txt 2>&1 &
-# Install and run postgres
+# Install and run benchmark
 sleep $WAIT_SECS
-$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh -u $USERNAME
-$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR

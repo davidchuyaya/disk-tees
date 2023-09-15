@@ -1,0 +1,1359 @@
+Beginning matchmaking phase
+Executing command: /home/davidchuyaya/disk-tees/build/client0/../../cloud_scripts/ccf_networking/send_json.sh -a 20.13.133.46:10200 -e match -j '{"ballot":"0,0,0","config":[[0,"10.0.0.5"],[1,"10.0.0.4"]]}'
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   105  100    46  100    59   3833   4916 --:--:-- --:--:-- --:--:--  8750
+Matchmaking complete
+Connecting to replicas
+Unable to TCP connect to server 10.0.0.5:10100, retrying in 1s...
+TCP connection to server successful
+SSL connection to server successful
+Unable to TCP connect to server 10.0.0.4:10101, retrying in 1s...
+TCP connection to server successful
+SSL connection to server successful
+Connected to replicas
+Broadcasted p1a to replicas, waiting for p1b quorum
+No prior state, don't need to request disk
+Broadcasting p2a to replicas
+P2b quorum reached, leader election complete!
+Mean write time: 40us
+Mean write time: 52us
+Mean write time: 38us
+Mean write time: 51us
+Mean write time: 161us
+Mean write time: 48us
+Mean write time: 35us
+Mean write time: 42us
+Mean write time: 39us
+Mean write time: 79us
+Mean write time: 81us
+Mean write time: 81us
+Mean write time: 145us
+Mean write time: 39us
+Mean write time: 55us
+Mean write time: 55us
+Mean write time: 47us
+Mean write time: 76us
+Mean write time: 75us
+Mean write time: 150us
+Mean write time: 44us
+Mean write time: 39us
+Mean write time: 42us
+Mean write time: 32us
+Mean fsync wait time: 204us
+Mean fsync wait time: 185us
+Mean fsync wait time: 191us
+Mean fsync wait time: 261us
+Mean fsync wait time: 217us
+Mean fsync wait time: 174us
+Mean fsync wait time: 214us
+Mean fsync wait time: 234us
+Mean fsync wait time: 198us
+Mean fsync wait time: 198us
+Mean fsync wait time: 221us
+Mean fsync wait time: 216us
+Mean fsync wait time: 219us
+Mean fsync wait time: 176us
+Mean fsync wait time: 201us
+Mean fsync wait time: 212us
+Mean fsync wait time: 257us
+Mean fsync wait time: 254us
+Mean fsync wait time: 223us
+Mean fsync wait time: 223us
+Mean fsync wait time: 232us
+Mean fsync wait time: 284us
+Mean fsync wait time: 227us
+Mean write time: 31us
+Mean fsync wait time: 250us
+Mean write time: 34us
+Mean fsync wait time: 218us
+Mean write time: 52us
+Mean fsync wait time: 1491us
+Mean write time: 688us
+Mean fsync wait time: 495us
+Mean write time: 139us
+Mean fsync wait time: 307us
+Mean write time: 55us
+Mean write time: 29us
+Mean fsync wait time: 378us
+Mean write time: 85us
+Mean fsync wait time: 351us
+Mean write time: 118us
+Mean write time: 29us
+Mean fsync wait time: 355us
+Mean write time: 112us
+Mean fsync wait time: 474us
+Mean write time: 39us
+Mean fsync wait time: 625us
+Mean write time: 64us
+Mean fsync wait time: 398us
+Mean write time: 46us
+Mean fsync wait time: 276us
+Mean write time: 63us
+Mean fsync wait time: 487us
+Mean write time: 55us
+Mean fsync wait time: 636us
+Mean write time: 113us
+Mean fsync wait time: 318us
+Mean write time: 40us
+Mean write time: 53us
+Mean fsync wait time: 337us
+Mean write time: 38us
+Mean write time: 63us
+Mean fsync wait time: 239us
+Mean write time: 42us
+Mean fsync wait time: 521us
+Mean write time: 47us
+Mean write time: 43us
+Mean fsync wait time: 473us
+Mean write time: 53us
+Mean write time: 61us
+Mean fsync wait time: 253us
+Mean write time: 35us
+Mean write time: 32us
+Mean fsync wait time: 207us
+Mean write time: 46us
+Mean write time: 48us
+Mean write time: 31us
+Mean fsync wait time: 800us
+Mean write time: 41us
+Mean write time: 43us
+Mean write time: 38us
+Mean fsync wait time: 439us
+Mean write time: 45us
+Mean fsync wait time: 970us
+Mean write time: 44us
+Mean write time: 33us
+Mean fsync wait time: 375us
+Mean write time: 107us
+Mean fsync wait time: 547us
+Mean write time: 44us
+Mean write time: 37us
+Mean fsync wait time: 441us
+Mean write time: 83us
+Mean write time: 59us
+Mean fsync wait time: 248us
+Mean write time: 84us
+Mean write time: 42us
+Mean fsync wait time: 265us
+Mean write time: 69us
+Mean write time: 39us
+Mean write time: 40us
+Mean fsync wait time: 1047us
+Mean write time: 229us
+Mean write time: 32us
+Mean fsync wait time: 274us
+Mean write time: 69us
+Mean write time: 67us
+Mean fsync wait time: 950us
+Mean write time: 255us
+Mean fsync wait time: 250us
+Mean write time: 47us
+Mean write time: 41us
+Mean fsync wait time: 461us
+Mean write time: 48us
+Mean fsync wait time: 1295us
+Mean write time: 48us
+Mean fsync wait time: 230us
+Mean write time: 41us
+Mean write time: 41us
+Mean fsync wait time: 180us
+Mean write time: 37us
+Mean write time: 46us
+Mean fsync wait time: 374us
+Mean write time: 26us
+Mean fsync wait time: 1157us
+Mean write time: 37us
+Mean write time: 109us
+Mean write time: 41us
+Mean write time: 72us
+Mean fsync wait time: 640us
+Mean write time: 41us
+Mean write time: 48us
+Mean fsync wait time: 341us
+Mean write time: 37us
+Mean write time: 48us
+Mean fsync wait time: 544us
+Mean write time: 40us
+Mean write time: 45us
+Mean fsync wait time: 722us
+Mean write time: 41us
+Mean write time: 42us
+Mean fsync wait time: 225us
+Mean write time: 58us
+Mean write time: 70us
+Mean fsync wait time: 473us
+Mean write time: 146us
+Mean write time: 54us
+Mean write time: 57us
+Mean fsync wait time: 533us
+Mean write time: 70us
+Mean write time: 71us
+Mean fsync wait time: 841us
+Mean write time: 79us
+Mean write time: 74us
+Mean write time: 56us
+Mean fsync wait time: 668us
+Mean write time: 34us
+Mean fsync wait time: 337us
+Mean write time: 44us
+Mean write time: 78us
+Mean fsync wait time: 321us
+Mean write time: 41us
+Mean write time: 134us
+Mean fsync wait time: 293us
+Mean write time: 71us
+Mean write time: 49us
+Mean fsync wait time: 332us
+Mean write time: 49us
+Mean write time: 38us
+Mean write time: 35us
+Mean fsync wait time: 624us
+Mean write time: 425us
+Mean fsync wait time: 1745us
+Mean write time: 43us
+Mean write time: 40us
+Mean fsync wait time: 735us
+Mean write time: 50us
+Mean fsync wait time: 839us
+Mean write time: 56us
+Mean fsync wait time: 1401us
+Mean write time: 201us
+Mean write time: 43us
+Mean fsync wait time: 225us
+Mean write time: 36us
+Mean write time: 44us
+Mean fsync wait time: 195us
+Mean write time: 61us
+Mean write time: 44us
+Mean write time: 42us
+Mean fsync wait time: 1318us
+Mean write time: 44us
+Mean write time: 84us
+Mean fsync wait time: 685us
+Mean write time: 48us
+Mean write time: 57us
+Mean fsync wait time: 1087us
+Mean write time: 59us
+Mean write time: 44us
+Mean fsync wait time: 1541us
+Mean write time: 52us
+Mean fsync wait time: 949us
+Mean write time: 40us
+Mean fsync wait time: 596us
+Mean write time: 60us
+Mean write time: 66us
+Mean fsync wait time: 231us
+Mean write time: 58us
+Mean fsync wait time: 408us
+Mean write time: 48us
+Mean write time: 48us
+Mean write time: 62us
+Mean fsync wait time: 753us
+Mean write time: 45us
+Mean write time: 42us
+Mean write time: 40us
+Mean fsync wait time: 1656us
+Mean write time: 66us
+Mean write time: 46us
+Mean fsync wait time: 1289us
+Mean write time: 46us
+Mean fsync wait time: 1296us
+Mean write time: 57us
+Mean write time: 59us
+Mean fsync wait time: 870us
+Mean write time: 51us
+Mean fsync wait time: 486us
+Mean write time: 43us
+Mean fsync wait time: 250us
+Mean write time: 54us
+Mean write time: 39us
+Mean fsync wait time: 760us
+Mean write time: 46us
+Mean fsync wait time: 699us
+Mean write time: 55us
+Mean write time: 52us
+Mean fsync wait time: 969us
+Mean write time: 49us
+Mean write time: 45us
+Mean fsync wait time: 563us
+Mean write time: 39us
+Mean write time: 42us
+Mean fsync wait time: 735us
+Mean write time: 42us
+Mean write time: 44us
+Mean fsync wait time: 893us
+Mean write time: 72us
+Mean fsync wait time: 245us
+Mean write time: 39us
+Mean fsync wait time: 233us
+Mean write time: 38us
+Mean write time: 43us
+Mean fsync wait time: 429us
+Mean write time: 42us
+Mean write time: 45us
+Mean fsync wait time: 891us
+Mean write time: 41us
+Mean write time: 42us
+Mean write time: 42us
+Mean fsync wait time: 1621us
+Mean write time: 41us
+Mean fsync wait time: 1480us
+Mean write time: 35us
+Mean fsync wait time: 857us
+Mean write time: 42us
+Mean fsync wait time: 232us
+Mean write time: 41us
+Mean fsync wait time: 187us
+Mean write time: 48us
+Mean write time: 48us
+Mean fsync wait time: 661us
+Mean write time: 50us
+Mean fsync wait time: 856us
+Mean write time: 48us
+Mean write time: 53us
+Mean fsync wait time: 609us
+Mean write time: 43us
+Mean fsync wait time: 1082us
+Mean write time: 39us
+Mean write time: 45us
+Mean fsync wait time: 841us
+Mean write time: 46us
+Mean write time: 78us
+Mean fsync wait time: 550us
+Mean write time: 47us
+Mean fsync wait time: 310us
+Mean write time: 48us
+Mean fsync wait time: 223us
+Mean write time: 44us
+Mean write time: 54us
+Mean fsync wait time: 767us
+Mean write time: 46us
+Mean write time: 45us
+Mean fsync wait time: 743us
+Mean write time: 63us
+Mean write time: 62us
+Mean write time: 60us
+Mean fsync wait time: 640us
+Mean write time: 44us
+Mean write time: 45us
+Mean fsync wait time: 1314us
+Mean write time: 71us
+Mean write time: 229us
+Mean fsync wait time: 1462us
+Mean write time: 290us
+Mean write time: 46us
+Mean fsync wait time: 556us
+Mean write time: 69us
+Mean write time: 48us
+Mean fsync wait time: 210us
+Mean write time: 48us
+Mean write time: 56us
+Mean fsync wait time: 510us
+Mean write time: 43us
+Mean fsync wait time: 500us
+Mean write time: 62us
+Mean write time: 44us
+Mean write time: 43us
+Mean fsync wait time: 919us
+Mean write time: 68us
+Mean write time: 44us
+Mean fsync wait time: 963us
+Mean write time: 246us
+Mean write time: 46us
+Mean fsync wait time: 1096us
+Mean write time: 51us
+Mean fsync wait time: 1054us
+Mean write time: 44us
+Mean fsync wait time: 273us
+Mean write time: 45us
+Mean write time: 45us
+Mean fsync wait time: 211us
+Mean write time: 48us
+Mean write time: 55us
+Mean fsync wait time: 921us
+Mean write time: 59us
+Mean fsync wait time: 868us
+Mean write time: 48us
+Mean write time: 47us
+Mean write time: 51us
+Mean fsync wait time: 790us
+Mean write time: 50us
+Mean fsync wait time: 470us
+Mean write time: 41us
+Mean fsync wait time: 750us
+Mean write time: 63us
+Mean write time: 55us
+Mean fsync wait time: 1624us
+Mean write time: 44us
+Mean fsync wait time: 418us
+Mean write time: 44us
+Mean fsync wait time: 231us
+Mean write time: 71us
+Mean write time: 41us
+Mean write time: 41us
+Mean fsync wait time: 834us
+Mean write time: 50us
+Mean write time: 57us
+Mean fsync wait time: 440us
+Mean write time: 46us
+Mean write time: 40us
+Mean write time: 42us
+Mean fsync wait time: 1368us
+Mean write time: 43us
+Mean fsync wait time: 1809us
+Mean write time: 40us
+Mean write time: 43us
+Mean fsync wait time: 741us
+Mean write time: 40us
+Mean fsync wait time: 669us
+Mean write time: 54us
+Mean write time: 42us
+Mean fsync wait time: 218us
+Mean write time: 40us
+Mean write time: 38us
+Mean fsync wait time: 964us
+Mean write time: 83us
+Mean write time: 45us
+Mean fsync wait time: 1316us
+Mean write time: 180us
+Mean write time: 51us
+Mean write time: 101us
+Mean fsync wait time: 1501us
+Mean write time: 292us
+Mean fsync wait time: 1216us
+Mean write time: 43us
+Mean write time: 44us
+Mean fsync wait time: 818us
+Mean write time: 41us
+Mean write time: 45us
+Mean fsync wait time: 623us
+Mean write time: 40us
+Mean write time: 48us
+Mean fsync wait time: 309us
+Mean write time: 40us
+Mean write time: 40us
+Mean fsync wait time: 192us
+Mean write time: 45us
+Mean write time: 41us
+Mean fsync wait time: 593us
+Mean write time: 42us
+Mean fsync wait time: 639us
+Mean write time: 87us
+Mean write time: 68us
+Mean write time: 44us
+Mean write time: 47us
+Mean fsync wait time: 1047us
+Mean write time: 49us
+Mean fsync wait time: 1374us
+Mean write time: 205us
+Mean fsync wait time: 328us
+Mean write time: 44us
+Mean fsync wait time: 419us
+Mean write time: 49us
+Mean write time: 41us
+Mean fsync wait time: 195us
+Mean write time: 39us
+Mean write time: 41us
+Mean write time: 41us
+Mean fsync wait time: 689us
+Mean write time: 41us
+Mean fsync wait time: 904us
+Mean write time: 40us
+Mean write time: 41us
+Mean fsync wait time: 974us
+Mean write time: 110us
+Mean write time: 43us
+Mean fsync wait time: 1531us
+Mean write time: 43us
+Mean fsync wait time: 971us
+Mean write time: 49us
+Mean fsync wait time: 855us
+Mean write time: 35us
+Mean write time: 47us
+Mean fsync wait time: 238us
+Mean write time: 40us
+Mean fsync wait time: 222us
+Mean write time: 40us
+Mean write time: 47us
+Mean fsync wait time: 1104us
+Mean write time: 42us
+Mean write time: 39us
+Mean fsync wait time: 1234us
+Mean write time: 44us
+Mean write time: 42us
+Mean fsync wait time: 1114us
+Mean write time: 42us
+Mean write time: 40us
+Mean fsync wait time: 1200us
+Mean write time: 38us
+Mean fsync wait time: 968us
+Mean write time: 43us
+Mean fsync wait time: 397us
+Mean write time: 54us
+Mean write time: 45us
+Mean fsync wait time: 224us
+Mean write time: 43us
+Mean write time: 41us
+Mean fsync wait time: 493us
+Mean write time: 48us
+Mean write time: 40us
+Mean fsync wait time: 486us
+Mean write time: 40us
+Mean write time: 43us
+Mean fsync wait time: 970us
+Mean write time: 40us
+Mean fsync wait time: 611us
+Mean write time: 44us
+Mean fsync wait time: 630us
+Mean write time: 42us
+Mean fsync wait time: 351us
+Mean write time: 47us
+Mean write time: 40us
+Mean fsync wait time: 220us
+Mean write time: 46us
+Mean write time: 41us
+Mean write time: 65us
+Mean fsync wait time: 1259us
+Mean write time: 39us
+Mean write time: 40us
+Mean fsync wait time: 672us
+Mean write time: 37us
+Mean write time: 42us
+Mean fsync wait time: 1714us
+Mean write time: 136us
+Mean write time: 120us
+Mean fsync wait time: 1380us
+Mean write time: 348us
+Mean fsync wait time: 1313us
+Mean write time: 39us
+Mean write time: 44us
+Mean fsync wait time: 404us
+Mean write time: 52us
+Mean fsync wait time: 139us
+Mean write time: 44us
+Mean fsync wait time: 195us
+Mean write time: 50us
+Mean write time: 45us
+Mean fsync wait time: 387us
+Mean write time: 37us
+Mean fsync wait time: 797us
+Mean write time: 40us
+Mean write time: 42us
+Mean write time: 41us
+Mean write time: 46us
+Mean fsync wait time: 1042us
+Mean write time: 40us
+Mean write time: 46us
+Mean fsync wait time: 756us
+Mean write time: 39us
+Mean write time: 42us
+Mean fsync wait time: 815us
+Mean write time: 43us
+Mean fsync wait time: 380us
+Mean write time: 47us
+Mean write time: 44us
+Mean fsync wait time: 221us
+Mean write time: 46us
+Mean write time: 54us
+Mean fsync wait time: 1055us
+Mean write time: 71us
+Mean fsync wait time: 720us
+Mean write time: 49us
+Mean write time: 59us
+Mean write time: 56us
+Mean write time: 41us
+Mean fsync wait time: 1402us
+Mean write time: 41us
+Mean fsync wait time: 817us
+Mean write time: 57us
+Mean write time: 61us
+Mean fsync wait time: 472us
+Mean write time: 54us
+Mean fsync wait time: 420us
+Mean write time: 43us
+Mean fsync wait time: 232us
+Mean write time: 49us
+Mean write time: 43us
+Mean fsync wait time: 560us
+Mean write time: 102us
+Mean write time: 42us
+Mean fsync wait time: 531us
+Mean write time: 37us
+Mean write time: 41us
+Mean write time: 38us
+Mean write time: 41us
+Mean fsync wait time: 600us
+Mean write time: 41us
+Mean fsync wait time: 1117us
+Mean write time: 42us
+Mean fsync wait time: 987us
+Mean write time: 41us
+Mean write time: 41us
+Mean fsync wait time: 805us
+Mean write time: 48us
+Mean write time: 41us
+Mean fsync wait time: 323us
+Mean write time: 38us
+Mean fsync wait time: 236us
+Mean write time: 37us
+Mean write time: 39us
+Mean fsync wait time: 952us
+Mean write time: 30us
+Mean fsync wait time: 942us
+Mean write time: 41us
+Mean write time: 35us
+Mean write time: 33us
+Mean fsync wait time: 2305us
+Mean write time: 362us
+Mean fsync wait time: 631us
+Mean write time: 47us
+Mean fsync wait time: 1535us
+Mean write time: 70us
+Mean fsync wait time: 225us
+Mean write time: 41us
+Mean fsync wait time: 288us
+Mean write time: 48us
+Mean fsync wait time: 271us
+Mean write time: 44us
+Mean write time: 41us
+Mean write time: 44us
+Mean fsync wait time: 657us
+Mean write time: 58us
+Mean write time: 47us
+Mean fsync wait time: 1475us
+Mean write time: 301us
+Mean write time: 44us
+Mean fsync wait time: 1224us
+Mean write time: 40us
+Mean write time: 42us
+Mean fsync wait time: 977us
+Mean write time: 45us
+Mean write time: 40us
+Mean fsync wait time: 738us
+Mean write time: 43us
+Mean fsync wait time: 279us
+Mean write time: 46us
+Mean fsync wait time: 193us
+Mean write time: 42us
+Mean write time: 49us
+Mean fsync wait time: 405us
+Mean write time: 41us
+Mean fsync wait time: 627us
+Mean write time: 41us
+Mean write time: 43us
+Mean fsync wait time: 1233us
+Mean write time: 44us
+Mean fsync wait time: 1239us
+Mean write time: 47us
+Mean fsync wait time: 948us
+Mean write time: 63us
+Mean fsync wait time: 429us
+Mean write time: 58us
+Mean fsync wait time: 223us
+Mean write time: 39us
+Mean fsync wait time: 238us
+Mean write time: 43us
+Mean write time: 37us
+Mean write time: 41us
+Mean fsync wait time: 722us
+Mean write time: 38us
+Mean write time: 39us
+Mean write time: 38us
+Mean fsync wait time: 1528us
+Mean write time: 38us
+Mean fsync wait time: 1103us
+Mean write time: 40us
+Mean write time: 40us
+Mean fsync wait time: 1111us
+Mean write time: 38us
+Mean fsync wait time: 484us
+Mean write time: 39us
+Mean write time: 41us
+Mean fsync wait time: 571us
+Mean write time: 41us
+Mean write time: 41us
+Mean fsync wait time: 221us
+Mean write time: 38us
+Mean write time: 43us
+Mean write time: 669us
+Mean fsync wait time: 700us
+Mean write time: 53us
+Mean write time: 43us
+Mean fsync wait time: 653us
+Mean write time: 52us
+Mean write time: 33us
+Mean fsync wait time: 1389us
+Mean write time: 41us
+Mean fsync wait time: 1138us
+Mean write time: 398us
+Mean fsync wait time: 614us
+Mean write time: 38us
+Mean write time: 39us
+Mean fsync wait time: 410us
+Mean write time: 41us
+Mean fsync wait time: 186us
+Mean write time: 37us
+Mean write time: 38us
+Mean fsync wait time: 656us
+Mean write time: 48us
+Mean fsync wait time: 606us
+Mean write time: 37us
+Mean write time: 38us
+Mean write time: 37us
+Mean fsync wait time: 1136us
+Mean write time: 643us
+Mean write time: 41us
+Mean fsync wait time: 1913us
+Mean write time: 193us
+Mean fsync wait time: 283us
+Mean write time: 590us
+Mean fsync wait time: 1046us
+Mean write time: 41us
+Mean fsync wait time: 241us
+Mean write time: 38us
+Mean fsync wait time: 240us
+Mean write time: 37us
+Mean fsync wait time: 216us
+Mean write time: 36us
+Mean write time: 39us
+Mean write time: 41us
+Mean fsync wait time: 639us
+Mean write time: 36us
+Mean write time: 39us
+Mean write time: 40us
+Mean fsync wait time: 1844us
+Mean write time: 37us
+Mean fsync wait time: 594us
+Mean write time: 45us
+Mean write time: 40us
+Mean fsync wait time: 839us
+Mean write time: 53us
+Mean write time: 44us
+Mean fsync wait time: 1154us
+Mean write time: 42us
+Mean write time: 44us
+Mean fsync wait time: 531us
+Mean write time: 40us
+Mean fsync wait time: 344us
+Mean write time: 40us
+Mean write time: 48us
+Mean fsync wait time: 671us
+Mean write time: 37us
+Mean fsync wait time: 558us
+Mean write time: 41us
+Mean write time: 42us
+Mean fsync wait time: 1029us
+Mean write time: 187us
+Mean fsync wait time: 201us
+Mean fsync wait time: 880us
+Mean write time: 52us
+Mean write time: 43us
+Mean fsync wait time: 292us
+Mean write time: 47us
+Mean fsync wait time: 299us
+Mean write time: 42us
+Mean fsync wait time: 225us
+Mean write time: 36us
+Mean write time: 34us
+Mean fsync wait time: 601us
+Mean write time: 38us
+Mean fsync wait time: 550us
+Mean write time: 38us
+Mean write time: 40us
+Mean fsync wait time: 1191us
+Mean write time: 48us
+Mean write time: 44us
+Mean fsync wait time: 882us
+Mean write time: 56us
+Mean write time: 43us
+Mean fsync wait time: 907us
+Mean write time: 40us
+Mean write time: 42us
+Mean fsync wait time: 1205us
+Mean write time: 38us
+Mean fsync wait time: 319us
+Mean write time: 42us
+Mean fsync wait time: 189us
+Mean write time: 35us
+Mean write time: 38us
+Mean write time: 42us
+Mean fsync wait time: 1050us
+Mean write time: 88us
+Mean write time: 44us
+Mean fsync wait time: 1583us
+Mean write time: 46us
+Mean fsync wait time: 1106us
+Mean write time: 137us
+Mean write time: 43us
+Mean fsync wait time: 911us
+Mean write time: 36us
+Mean write time: 43us
+Mean fsync wait time: 755us
+Mean write time: 38us
+Mean fsync wait time: 398us
+Mean write time: 41us
+Mean write time: 40us
+Mean fsync wait time: 195us
+Mean write time: 35us
+Mean write time: 38us
+Mean fsync wait time: 990us
+Mean write time: 40us
+Mean fsync wait time: 440us
+Mean write time: 35us
+Mean write time: 39us
+Mean fsync wait time: 1454us
+Mean write time: 47us
+Mean fsync wait time: 1090us
+Mean write time: 44us
+Mean write time: 44us
+Mean fsync wait time: 735us
+Mean write time: 40us
+Mean write time: 39us
+Mean fsync wait time: 261us
+Mean write time: 36us
+Mean write time: 38us
+Mean fsync wait time: 220us
+Mean write time: 39us
+Mean write time: 27us
+Mean fsync wait time: 195us
+Mean write time: 38us
+Mean write time: 44us
+Mean fsync wait time: 736us
+Mean write time: 39us
+Mean write time: 40us
+Mean write time: 41us
+Mean write time: 37us
+Mean fsync wait time: 1277us
+Mean write time: 42us
+Mean fsync wait time: 1244us
+Mean write time: 39us
+Mean fsync wait time: 1383us
+Mean write time: 37us
+Mean write time: 42us
+Mean fsync wait time: 572us
+Mean write time: 29us
+Mean write time: 42us
+Mean fsync wait time: 257us
+Mean write time: 35us
+Mean fsync wait time: 214us
+Mean write time: 38us
+Mean write time: 57us
+Mean fsync wait time: 849us
+Mean write time: 37us
+Mean fsync wait time: 875us
+Mean write time: 38us
+Mean write time: 41us
+Mean write time: 60us
+Mean fsync wait time: 592us
+Mean write time: 39us
+Mean write time: 43us
+Mean fsync wait time: 490us
+Mean write time: 39us
+Mean fsync wait time: 1352us
+Mean write time: 38us
+Mean write time: 41us
+Mean fsync wait time: 254us
+Mean write time: 37us
+Mean fsync wait time: 191us
+Mean write time: 37us
+Mean write time: 54us
+Mean write time: 946us
+Mean fsync wait time: 921us
+Mean write time: 39us
+Mean write time: 40us
+Mean fsync wait time: 597us
+Mean write time: 32us
+Mean write time: 45us
+Mean write time: 41us
+Mean write time: 67us
+Mean fsync wait time: 922us
+Mean write time: 40us
+Mean fsync wait time: 1257us
+Mean write time: 50us
+Mean fsync wait time: 1019us
+Mean write time: 37us
+Mean fsync wait time: 601us
+Mean write time: 39us
+Mean write time: 43us
+Mean fsync wait time: 378us
+Mean write time: 40us
+Mean fsync wait time: 187us
+Mean write time: 35us
+Mean write time: 49us
+Mean write time: 34us
+Mean fsync wait time: 668us
+Mean write time: 37us
+Mean write time: 40us
+Mean write time: 38us
+Mean write time: 40us
+Mean fsync wait time: 1794us
+Mean write time: 39us
+Mean write time: 37us
+Mean fsync wait time: 1175us
+Mean write time: 40us
+Mean fsync wait time: 1437us
+Mean write time: 36us
+Mean write time: 37us
+Mean fsync wait time: 917us
+Mean write time: 35us
+Mean write time: 42us
+Mean fsync wait time: 385us
+Mean write time: 48us
+Mean fsync wait time: 225us
+Mean write time: 38us
+Mean write time: 37us
+Mean write time: 38us
+Mean fsync wait time: 763us
+Mean write time: 77us
+Mean fsync wait time: 833us
+Mean write time: 41us
+Mean write time: 44us
+Mean write time: 40us
+Mean fsync wait time: 2034us
+Mean write time: 535us
+Mean write time: 48us
+Mean fsync wait time: 1191us
+Mean write time: 722us
+Mean fsync wait time: 820us
+Mean write time: 39us
+Mean write time: 44us
+Mean fsync wait time: 279us
+Mean write time: 41us
+Mean write time: 39us
+Mean fsync wait time: 201us
+Mean write time: 35us
+Mean write time: 41us
+Mean fsync wait time: 698us
+Mean write time: 41us
+Mean write time: 41us
+Mean fsync wait time: 700us
+Mean write time: 37us
+Mean write time: 40us
+Mean write time: 39us
+Mean write time: 40us
+Mean fsync wait time: 1603us
+Mean write time: 41us
+Mean fsync wait time: 825us
+Mean write time: 47us
+Mean write time: 45us
+Mean fsync wait time: 610us
+Mean write time: 57us
+Mean fsync wait time: 257us
+Mean write time: 39us
+Mean write time: 41us
+Mean fsync wait time: 180us
+Mean write time: 41us
+Mean fsync wait time: 222us
+Mean write time: 42us
+Mean write time: 37us
+Mean write time: 43us
+Mean fsync wait time: 525us
+Mean write time: 51us
+Mean write time: 38us
+Mean fsync wait time: 1491us
+Mean write time: 41us
+Mean fsync wait time: 937us
+Mean write time: 35us
+Mean write time: 34us
+Mean fsync wait time: 516us
+Mean write time: 40us
+Mean write time: 42us
+Mean fsync wait time: 1404us
+Mean write time: 55us
+Mean fsync wait time: 228us
+Mean write time: 43us
+Mean fsync wait time: 384us
+Mean write time: 42us
+Mean write time: 56us
+Mean fsync wait time: 677us
+Mean write time: 36us
+Mean write time: 66us
+Mean fsync wait time: 539us
+Mean write time: 45us
+Mean write time: 38us
+Mean fsync wait time: 1103us
+Mean write time: 35us
+Mean fsync wait time: 1459us
+Mean write time: 58us
+Mean write time: 39us
+Mean fsync wait time: 838us
+Mean write time: 47us
+Mean fsync wait time: 199us
+Mean write time: 44us
+Mean fsync wait time: 598us
+Mean write time: 132us
+Mean write time: 50us
+Mean fsync wait time: 853us
+Mean write time: 119us
+Mean fsync wait time: 429us
+Mean write time: 36us
+Mean write time: 43us
+Mean write time: 39us
+Mean fsync wait time: 1703us
+Mean write time: 47us
+Mean fsync wait time: 1044us
+Mean write time: 39us
+Mean fsync wait time: 1545us
+Mean write time: 36us
+Mean write time: 40us
+Mean fsync wait time: 317us
+Mean write time: 62us
+Mean write time: 42us
+Mean fsync wait time: 172us
+Mean write time: 41us
+Mean write time: 37us
+Mean write time: 30us
+Mean fsync wait time: 778us
+Mean write time: 46us
+Mean write time: 56us
+Mean write time: 45us
+Mean fsync wait time: 936us
+Mean write time: 46us
+Mean fsync wait time: 360us
+Mean write time: 39us
+Mean fsync wait time: 1315us
+Mean write time: 50us
+Mean fsync wait time: 1015us
+Mean write time: 37us
+Mean fsync wait time: 333us
+Mean write time: 43us
+Mean write time: 41us
+Mean fsync wait time: 247us
+Mean write time: 55us
+Mean write time: 50us
+Mean fsync wait time: 938us
+Mean write time: 51us
+Mean fsync wait time: 583us
+Mean write time: 75us
+Mean write time: 38us
+Mean write time: 48us
+Mean fsync wait time: 700us
+Mean write time: 33us
+Mean fsync wait time: 1120us
+Mean write time: 38us
+Mean write time: 39us
+Mean fsync wait time: 586us
+Mean write time: 38us
+Mean fsync wait time: 163us
+Mean write time: 35us
+Mean fsync wait time: 210us
+Mean write time: 38us
+Mean write time: 28us
+Mean fsync wait time: 594us
+Mean write time: 39us
+Mean write time: 40us
+Mean fsync wait time: 659us
+Mean write time: 37us
+Mean write time: 39us
+Mean write time: 45us
+Mean fsync wait time: 1021us
+Mean write time: 40us
+Mean fsync wait time: 1287us
+Mean write time: 38us
+Mean fsync wait time: 831us
+Mean write time: 33us
+Mean write time: 33us
+Mean fsync wait time: 1170us
+Mean write time: 41us
+Mean write time: 42us
+Mean fsync wait time: 456us
+Mean write time: 41us
+Mean write time: 39us
+Mean fsync wait time: 454us
+Mean write time: 74us
+Mean write time: 35us
+Mean write time: 41us
+Mean fsync wait time: 879us
+Mean write time: 37us
+Mean fsync wait time: 247us
+Mean write time: 62us
+Mean write time: 39us
+Mean fsync wait time: 1075us
+Mean write time: 42us
+Mean write time: 41us
+Mean fsync wait time: 349us
+Mean write time: 54us
+Mean fsync wait time: 998us
+Mean write time: 96us
+Mean fsync wait time: 699us
+Mean write time: 47us
+Mean fsync wait time: 197us
+Mean write time: 37us
+Mean write time: 38us
+Mean fsync wait time: 217us
+Mean write time: 38us
+Mean write time: 41us
+Mean write time: 41us
+Mean fsync wait time: 607us
+Mean write time: 39us
+Mean fsync wait time: 319us
+Mean write time: 40us
+Mean write time: 42us
+Mean write time: 38us
+Mean fsync wait time: 664us
+Mean write time: 73us
+Mean fsync wait time: 705us
+Mean write time: 36us
+Mean fsync wait time: 1140us
+Mean write time: 39us
+Mean fsync wait time: 867us
+Mean write time: 41us
+Mean fsync wait time: 344us
+Mean write time: 42us
+Mean fsync wait time: 206us
+Mean write time: 51us
+Mean write time: 53us
+Mean write time: 44us
+Mean fsync wait time: 617us
+Mean write time: 38us
+Mean fsync wait time: 446us
+Mean write time: 38us
+Mean write time: 38us
+Mean write time: 37us
+Mean fsync wait time: 1381us
+Mean write time: 35us
+Mean fsync wait time: 1343us
+Mean write time: 307us
+Mean fsync wait time: 673us
+Mean write time: 50us
+Mean fsync wait time: 396us
+Mean write time: 39us
+Mean write time: 42us
+Mean fsync wait time: 411us
+Mean write time: 39us
+Mean write time: 39us
+Mean fsync wait time: 235us
+Mean write time: 42us
+Mean write time: 39us
+Mean fsync wait time: 205us
+Mean write time: 37us
+Mean write time: 41us
+Mean fsync wait time: 586us
+Mean write time: 38us
+Mean write time: 40us
+Mean fsync wait time: 262us
+Mean write time: 48us
+Mean write time: 42us
+Mean fsync wait time: 409us
+Mean write time: 53us
+Mean write time: 41us
+Mean write time: 40us
+Mean write time: 58us
+Mean fsync wait time: 782us
+Mean write time: 72us
+Mean write time: 37us
+Mean fsync wait time: 1155us
+Mean write time: 39us
+Mean write time: 43us
+Mean fsync wait time: 422us
+Mean write time: 57us
+Mean fsync wait time: 550us
+Mean write time: 37us
+Mean write time: 40us
+Mean fsync wait time: 401us
+Mean write time: 39us
+Mean fsync wait time: 216us
+Mean write time: 36us
+Mean fsync wait time: 239us
+Mean write time: 36us
+Mean write time: 39us
+Mean fsync wait time: 346us
+Mean write time: 37us
+Mean write time: 42us
+Mean fsync wait time: 442us
+Mean write time: 224us
+Mean fsync wait time: 409us
+Mean write time: 218us
+Mean fsync wait time: 426us
+Mean write time: 38us
+Mean fsync wait time: 221us
+Mean write time: 58us
+Mean fsync wait time: 242us
+Mean write time: 51us
+Mean write time: 49us
+Mean fsync wait time: 324us
+Mean write time: 31us
+Mean write time: 41us
+Mean fsync wait time: 269us
+Mean write time: 40us
+Mean write time: 79us
+Mean fsync wait time: 276us
+Mean write time: 52us
+Mean write time: 48us
+Mean fsync wait time: 210us
+Mean write time: 58us
+Mean write time: 30us
+Mean fsync wait time: 207us
+Mean write time: 91us
+Mean fsync wait time: 195us
+Mean write time: 46us
+Mean fsync wait time: 214us
+Mean write time: 40us
+Mean write time: 53us
+Mean fsync wait time: 267us
+Mean write time: 36us
+Mean write time: 72us
+Mean fsync wait time: 347us
+Mean write time: 62us
+Mean fsync wait time: 205us
+Mean fsync wait time: 201us
+Mean write time: 40us
+Mean write time: 38us
+Mean fsync wait time: 307us
+Mean write time: 36us
+Mean write time: 41us
+Mean fsync wait time: 254us
+Mean write time: 47us
+Mean write time: 41us
+Mean fsync wait time: 273us
+Mean write time: 42us
+Mean fsync wait time: 276us
+Mean fsync wait time: 238us
+Mean write time: 37us
+Mean write time: 39us
+Mean fsync wait time: 238us
+Mean write time: 35us
+Mean fsync wait time: 219us
+Mean write time: 45us
+Mean fsync wait time: 214us
+Mean write time: 39us
+Mean fsync wait time: 193us
+Mean write time: 38us
+Mean fsync wait time: 195us
+Mean write time: 39us
+Mean write time: 39us
+Mean fsync wait time: 191us
+Mean write time: 39us
+Mean write time: 46us
+Mean fsync wait time: 437us
+Mean write time: 38us
+Mean write time: 55us
+Mean write time: 52us
+Mean fsync wait time: 273us
+Mean write time: 61us
+Mean fsync wait time: 272us
+Mean write time: 41us
+Mean write time: 46us
+Mean fsync wait time: 255us
+Mean write time: 54us
+Mean write time: 48us
+Mean fsync wait time: 300us
+Mean write time: 41us
+Mean fsync wait time: 306us
+Mean write time: 44us
+Mean fsync wait time: 273us
+Mean write time: 39us
+Mean write time: 45us
+Mean fsync wait time: 289us
+Mean write time: 49us
+Mean write time: 39us
+Mean fsync wait time: 180us
+Mean write time: 52us
+Mean write time: 54us
+Mean fsync wait time: 158us
+Mean write time: 41us
+Mean fsync wait time: 192us
+Mean write time: 39us
+Mean write time: 38us
+Mean fsync wait time: 205us
+Mean write time: 38us
+Mean write time: 58us
+Mean fsync wait time: 313us
+Mean write time: 159us
+Mean fsync wait time: 248us
+Mean write time: 198us
+Mean write time: 101us
+Mean fsync wait time: 339us
+Mean write time: 76us
+Mean fsync wait time: 293us
+Mean fsync wait time: 339us
+Mean write time: 31us
+Mean fsync wait time: 214us
+Mean write time: 37us
+Mean write time: 37us
+Mean fsync wait time: 205us
+Mean write time: 55us
+Mean write time: 32us
+Mean fsync wait time: 224us
+Mean write time: 87us
+Mean write time: 75us
+Mean fsync wait time: 270us
+Mean write time: 43us
+Mean fsync wait time: 187us
+Mean write time: 48us
+Mean fsync wait time: 219us
+Mean write time: 40us
+Mean fsync wait time: 199us
+Mean write time: 42us
+Mean write time: 48us
+Mean fsync wait time: 248us
+Mean write time: 43us
+Mean write time: 39us
+Mean fsync wait time: 279us
+Mean write time: 37us
+Mean write time: 45us
+Mean fsync wait time: 230us
+Mean write time: 41us
+Mean fsync wait time: 373us
+Mean write time: 71us
+Mean fsync wait time: 295us
+Mean write time: 40us
+Mean fsync wait time: 203us
+Mean write time: 42us
+Mean fsync wait time: 232us
+Mean write time: 37us
+Mean write time: 42us
+Mean fsync wait time: 328us
+Mean write time: 32us
+Mean fsync wait time: 210us
+Mean write time: 39us
+Mean fsync wait time: 295us
+Mean write time: 48us
+Mean fsync wait time: 207us
+Mean write time: 48us
+Mean write time: 43us
+Mean fsync wait time: 361us
+Mean write time: 25us
+Mean fsync wait time: 223us
+Mean write time: 38us
+Mean fsync wait time: 222us
+Mean write time: 42us
+Mean fsync wait time: 286us
+Mean write time: 40us
+Mean fsync wait time: 506us
+Mean write time: 182us
+Mean fsync wait time: 561us
+Mean write time: 184us
+Mean fsync wait time: 261us
+Mean write time: 40us
+Mean fsync wait time: 271us
+Mean write time: 39us
+Mean fsync wait time: 249us
+Mean write time: 39us
+Mean write time: 30us
+Mean fsync wait time: 241us
+Mean write time: 50us
+Mean write time: 41us
+Mean fsync wait time: 217us
+Mean write time: 52us
+Mean fsync wait time: 280us
+Mean write time: 40us
+Mean write time: 60us
+Mean fsync wait time: 203us
+Mean write time: 50us
+Mean fsync wait time: 215us
+Mean write time: 39us
+Mean fsync wait time: 218us
+Mean write time: 39us
+Mean write time: 69us
+Mean fsync wait time: 238us
+Mean write time: 44us
+Mean fsync wait time: 533us
+Mean write time: 40us
+Mean fsync wait time: 393us
+Mean write time: 62us
+Mean fsync wait time: 498us
+Mean write time: 138us
+Mean write time: 45us
+Mean write time: 42us

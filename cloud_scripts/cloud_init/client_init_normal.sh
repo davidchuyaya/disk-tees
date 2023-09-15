@@ -17,7 +17,5 @@ BUILD_DIR=$PROJECT_DIR/build/$NAME
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 
-$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh -u $USERNAME
 DIR=${BUILD_DIR}/shim
 mkdir -p $DIR
-$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR

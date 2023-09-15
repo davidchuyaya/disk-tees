@@ -1,8 +1,6 @@
 # Rollbaccine
 2f+1 confidential servers to support a rollback-detecting disk abstraction.
 
-An application launched alongside Rollbaccine
-
 ## Installation 
 To run locally, this repo must be cloned to the user's home directory `~` and cannot be renamed, since the absolute location of many scripts is critical to correctness.
 
@@ -23,16 +21,16 @@ curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
 Execute the following:
 ```bash
-./launch.sh -t <trusted_mode> -p <postgres_mode> -w <wait time> -m <tmpfs memory>
+./launch.sh -t <trusted mode> -f <file system mode> [-b <benchmark type> -w <wait time> -m <tmpfs memory>]
 ```
 Documentation for each mode can be found by executing [`./launch.sh`](launch.sh). Note that the script will not work if you are not under the "Azure Research Subs" subscription in Azure. Be sure to modify the script to use your own subscription.
 
 To run locally, use `local` as the trusted mode. Files will be created under the `build` directory. Here are some ways I used `launch.sh` for local testing. Pick one to run:
 ```bash
-./launch.sh -t local -p normal
-./launch.sh -t local -p fuse -m 2
-./launch.sh -t local -p tmpfs -m 2
-./launch.sh -t local -p rollbaccine -w 10 -m 2
+./launch.sh -t local -f normal
+./launch.sh -t local -f fuse -m 2
+./launch.sh -t local -f tmpfs -m 2
+./launch.sh -t local -f rollbaccine -w 5 -m 2
 ```
 
 Note that sudo access will be required to mount tmpfs.
@@ -53,13 +51,15 @@ The certificates for CCF can be found locally in `build/workspace/sandbox_common
 
 ### Running on Azure
 
+We will describe how to launch the system for running TPC-C against Postgres.
+
 Launch the VMs with `./launch.sh` in the section above, with `-t untrusted` or `-t trusted` based on whether you want regular or confidential VMs.
 Then, start the actual machines in the following order:
 ```bash
-./run.sh -t <trusted_mode> -p <postgres_mode> -n ccf
-./run.sh -t <trusted_mode> -p <postgres_mode> -n replicas -m <tmpfs memory>
-./run.sh -t <trusted_mode> -p <postgres_mode> -n client -w <wait time> -m <tmpfs memory>
-./run.sh -t <trusted_mode> -p <postgres_mode> -n benchbase
+./run.sh -t <trusted_mode> -f rollbaccine -b postgres -n ccf
+./run.sh -t <trusted_mode> -f rollbaccine -b postgres -n replicas -m <tmpfs memory>
+./run.sh -t <trusted_mode> -f rollbaccine -b postgres -n client -w <wait time> -m <tmpfs memory>
+./run.sh -t <trusted_mode> -f rollbaccine -b postgres -n benchbase
 ```
 
 Only the client and benchbase need to be run if `<postgres_mode>` is not `rollbaccine`.
@@ -102,9 +102,13 @@ The system uses CCF to store configurations. The main logic is in [`ccf/src/matc
 
 When you're done running the system, or if the system terminates unexpectedly, you may need to unmount by executing the following:
 ```bash
-sudo umount <mountpoint>
+sudo umount -l <mountpoint>
 ```
 
+Kill outstanding processes by running:
+```bash
+pgrep -f <part of process name> | xargs kill -9
+```
 
 ## Libraries
 This project makes use of (and implicitly trusts) the following libraries:

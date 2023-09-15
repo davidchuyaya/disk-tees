@@ -18,8 +18,6 @@ NAME=client${ID}
 BUILD_DIR=$PROJECT_DIR/build/$NAME
 mkdir -p $BUILD_DIR
 
-$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh -u $USERNAME
 DIR=$BUILD_DIR/shim
 mkdir -p $DIR
 sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $DIR
-$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_run.sh -d $DIR
