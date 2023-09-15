@@ -33,7 +33,7 @@ done
 
 # Set variables
 SUBSCRIPTION="d8583813-7f3b-43a6-85ac-bac7e4751e5a" # Azure subscription internal to Microsoft Research. Change this to your own subscription.
-RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${FILE_SYSTEM_MODE}_${BENCHMARK_TYPE}
+RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${FILE_SYSTEM_MODE}
 NUM_REPLICAS=2
 NUM_CCF_NODES=3
 CCF_PORT=10200
@@ -196,7 +196,7 @@ az ppg create \
 create_vms() {
   UNTRUSTED_IMAGE="Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
   TRUSTED_IMAGE="Canonical:0001-com-ubuntu-confidential-vm-focal:20_04-lts-cvm:latest"
-  TRUSTED_PARAMS="--security-type ConfidentialVM
+  TRUSTED_PARAMS="  --security-type ConfidentialVM
                     --os-disk-security-encryption-type VMGuestStateOnly
                     --enable-vtpm"
   PARAMS="" # Reset params

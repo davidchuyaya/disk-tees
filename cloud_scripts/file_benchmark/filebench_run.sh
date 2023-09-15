@@ -23,11 +23,15 @@ PROJECT_DIR=/home/$USERNAME/disk-tees
 cd $PROJECT_DIR/cloud_scripts/file_benchmark
 
 # CONFIGS=("seq-read-1th-16g.f" "seq-read-32th-16g.f" "seq-write-1th-16g.f" "seq-write-32th-16g.f" "seq-fsync-1th-16g.f" "seq-fsync-32th-16g.f" "seq-read-32th-64g.f" "rnd-read-32th-64g.f" "seq-write-32th-64g.f" "rnd-write-32th-64g.f" "seq-fsync-32th-64g.f" "rnd-fsync-32th-64g.f" "file-server.f" "mail-server.f" "web-server.f")
+# TODO: Re-enable benchmarks above
 CONFIGS=("seq-read-1th-16g.f")
 DIR=$PROJECT_DIR/build/client0/shim
 
 RESULTS_DIR=$PROJECT_DIR/build/client0/results
 mkdir -p $RESULTS_DIR
+# See issue: https://github.com/filebench/filebench/issues/112
+echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+
 for CONFIG in "${CONFIGS[@]}"; do
     echo "Running $CONFIG..."
     # Set mount directory

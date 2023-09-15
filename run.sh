@@ -33,7 +33,7 @@ while getopts 't:f:b:n:w:m:' flag; do
   esac
 done
 
-RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${FILE_SYSTEM_MODE}_${BENCHMARK_TYPE}
+RESOURCE_GROUP=rollbaccine_${TRUSTED_MODE}_${FILE_SYSTEM_MODE}
 CCF_PORT=10200
 
 echo "Fetching VM IP addresses, if necessary, assuming launch.sh has been run..."
@@ -125,6 +125,7 @@ case $NODE_TYPE in
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n TMPFS_MEMORY -v $TMPFS_MEMORY
         $PROJECT_DIR/cloud_scripts/attach_var.sh -i $NEW_INIT_SCRIPT -o $NEW_INIT_SCRIPT -n USERNAME -v $USERNAME
         # Append benchmarking scripts
+        echo '' >> $NEW_INIT_SCRIPT
         case $BENCHMARK_TYPE in
             "postgres")
                 echo '$PROJECT_DIR/cloud_scripts/db_benchmark/postgres_install.sh -u $USERNAME' >> $NEW_INIT_SCRIPT

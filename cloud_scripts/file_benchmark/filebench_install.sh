@@ -25,7 +25,8 @@ tar -xvf filebench-1.5-alpha3.tar.gz
 rm filebench-1.5-alpha3.tar.gz
 cd filebench-1.5-alpha3
 # Install dependencies: https://github.com/filebench/filebench/wiki/Building-Filebench#building-filebench-from-the-git-repository
-sudo apt -y install bison flex
+sudo apt update
+sudo apt -y install bison flex build-essential
 ./configure
 make
 sudo make install
