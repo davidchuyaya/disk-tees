@@ -1,5 +1,5 @@
 # $dir should be set by a bash script before this file is run
-set mode quit alldone
+set mode quit timeout 
 set $nfiles=1
 set $meandirwidth=1
 set $nthreads=1

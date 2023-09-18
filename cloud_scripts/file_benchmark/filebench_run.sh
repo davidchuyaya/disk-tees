@@ -63,8 +63,8 @@ case $FILE_SYSTEM_MODE in
     for CONFIG in "${CONFIGS[@]}"; do
         echo "Running $CONFIG..."
         run_test $CONFIG
-        sudo umount -l $DIR
         pgrep -f tee_fuse | xargs kill -9
+        sudo umount -l $DIR
         sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $BUILD_DIR/storage
         $PROJECT_DIR/client/tee_fuse -i 0 -t $TRUSTED_MODE -u $USERNAME $DIR
     done;;
