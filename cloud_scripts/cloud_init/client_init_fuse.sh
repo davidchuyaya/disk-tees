@@ -34,4 +34,4 @@ cd $PROJECT_DIR
 cmake .
 make
 cd $BUILD_DIR
-$PROJECT_DIR/client/tee_fuse -i $ID -t $TRUSTED_MODE -u $USERNAME -s $DIR
+$PROJECT_DIR/client/tee_fuse -i $ID -t $TRUSTED_MODE -u $USERNAME $DIR

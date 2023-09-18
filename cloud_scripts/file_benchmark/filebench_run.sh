@@ -45,31 +45,28 @@ run_test() {
 
 case $FILE_SYSTEM_MODE in
   "normal")
-    # Mount managed disk. See https://learn.microsoft.com/en-us/azure/virtual-machines/linux/add-disk?tabs=ubuntu#format-the-disk
-    sudo parted /dev/sda --script mklabel gpt mkpart ext4 0% 100%
-    sudo partprobe /dev/sda
     for CONFIG in "${CONFIGS[@]}"; do
         echo "Running $CONFIG..."
-        sudo mkfs.ext4 /dev/sda1 # Reformat and remount on each test
-        sudo mount /dev/sda1 $DIR
         run_test $CONFIG
         sudo umount -l $DIR
+        sudo mkfs.ext4 /dev/sda1
+        sudo mount /dev/sda1 $DIR
     done;;
   "tmpfs")
     for CONFIG in "${CONFIGS[@]}"; do
         echo "Running $CONFIG..."
-        sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $DIR
         run_test $CONFIG
         sudo umount -l $DIR
+        sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $DIR
     done;;
   "fuse")
     for CONFIG in "${CONFIGS[@]}"; do
         echo "Running $CONFIG..."
-        sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $BUILD_DIR/storage
         run_test $CONFIG
         sudo umount -l $DIR
         pgrep -f tee_fuse | xargs kill -9
-        $PROJECT_DIR/client/tee_fuse -i 0 -t $TRUSTED_MODE -u $USERNAME -s $DIR
+        sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $BUILD_DIR/storage
+        $PROJECT_DIR/client/tee_fuse -i 0 -t $TRUSTED_MODE -u $USERNAME $DIR
     done;;
   "rollbaccine")
     echo "Unimplemented. Need to tell replicas to clear directory, then restart client without contacting CCF";;

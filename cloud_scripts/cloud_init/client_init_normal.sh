@@ -17,5 +17,12 @@ BUILD_DIR=$PROJECT_DIR/build/$NAME
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 
+# Mount managed disk. See https://learn.microsoft.com/en-us/azure/virtual-machines/linux/add-disk?tabs=ubuntu#format-the-disk
+sudo parted /dev/sda --script mklabel gpt mkpart ext4 0% 100%
+sudo partprobe /dev/sda
+sudo mkfs.ext4 /dev/sda1
+
 DIR=${BUILD_DIR}/shim
 mkdir -p $DIR
+
+sudo mount /dev/sda1 $DIR
