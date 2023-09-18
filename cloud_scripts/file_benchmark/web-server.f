@@ -1,6 +1,5 @@
 # $dir should be set by a bash script before this file is run
 set mode quit alldone
-set $dir=/home/bvangoor/COM_DIR/FUSE_EXT4_FS/
 set $nfiles=1250000
 set $meandirwidth=20
 set $nthreads=100
