@@ -18,11 +18,11 @@ mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 
 # Mount managed disk. See https://learn.microsoft.com/en-us/azure/virtual-machines/linux/add-disk?tabs=ubuntu#format-the-disk
-sudo parted /dev/sda --script mklabel gpt mkpart ext4 0% 100%
-sudo partprobe /dev/sda
-sudo mkfs.ext4 /dev/sda1
+sudo parted /dev/sdb --script mklabel gpt mkpart ext4 0% 100%
+sudo partprobe /dev/sdb
+sudo mkfs.ext4 /dev/sdb1
 
 DIR=${BUILD_DIR}/shim
 mkdir -p $DIR
 
-sudo mount /dev/sda1 $DIR
+sudo mount /dev/sdb1 $DIR

@@ -13,8 +13,7 @@ define process name=fileopen, instances=1
         thread name=fileopener, memsize=$io_size, instances=$nthreads
         {
                 flowop createfile name=create1, filesetname=bigfile, fd=1
-                flowop write name=write-file, filesetname=bigfile, iosize=$io_size, iters=$iterations, fd=1
-                flowop fsync name=fsync-file, fd=1
+                flowop write name=write-file, filesetname=bigfile, iosize=$io_size, iters=$iterations, dsync, fd=1
                 flowop closefile name=close1, fd=1
                 flowop finishoncount name=finish, value=1
         }

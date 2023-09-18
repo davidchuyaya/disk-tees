@@ -567,6 +567,7 @@ int ClientFuse::client_open(const char *path, fuse_file_info *fi) {
 	if (fd == -1)
 		return -errno;
 
+	// TODO: If flag contains O_DSYNC or O_SYNC, every single write must fsync
 	fi->fh = fd;
 	// std::cout << "Fh " << fd << " at path " << path << std::endl;
 

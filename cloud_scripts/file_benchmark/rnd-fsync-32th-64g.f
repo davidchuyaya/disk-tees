@@ -14,8 +14,7 @@ define process name=filerandomfsync, instances=1
         thread name=filewriter, memsize=$io_size, instances=$nthreads
         {
                 flowop createfile name=create1, filesetname=bigfileset, fd=1, indexed=1
-                flowop write name=write-file1, filesetname=bigfileset, random, iosize=$io_size,iters=$iterations, fd=1, indexed=1
-                flowop fsync name=fsync-file, fd=1
+                flowop write name=write-file1, filesetname=bigfileset, random, iosize=$io_size, iters=$iterations, dsync, fd=1, indexed=1
                 flowop closefile name=close1, fd=1, indexed=1
                 flowop finishoncount name=finish, value=1
         }

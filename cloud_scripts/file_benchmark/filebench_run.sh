@@ -49,8 +49,8 @@ case $FILE_SYSTEM_MODE in
         echo "Running $CONFIG..."
         run_test $CONFIG
         sudo umount -l $DIR
-        sudo mkfs.ext4 /dev/sda1
-        sudo mount /dev/sda1 $DIR
+        sudo mkfs.ext4 -F /dev/sdb1
+        sudo mount /dev/sdb1 $DIR
     done;;
   "tmpfs")
     for CONFIG in "${CONFIGS[@]}"; do
