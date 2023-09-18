@@ -1,5 +1,5 @@
 # $dir should be set by a bash script before this file is run
-set mode quit alldone
+set mode quit timeout
 set $nfiles=32
 set $meandirwidth=32
 set $nthreads=1
@@ -272,4 +272,5 @@ create files
 # Drop cache, as recommended by the Filebench paper
 system "sync"
 system "echo 3 > /proc/sys/vm/drop_caches"
-psrun -10
+# Since random accesses are slow, just time out after 5 minutes
+psrun -10 300
