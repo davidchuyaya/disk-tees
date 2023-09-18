@@ -27,20 +27,17 @@ Therefore, we do not need to tweak:
 
 Therefore, we designed the following tests:
 
-1. Single-threaded vs multi-threaded FUSE (16GB files so everything stays in memory):
-* [`seq-read-1th-16g`](seq-read-1th-16g.f): 1 thread sequentially reads from a single preallocated 16GB file.
-* [`seq-read-32th-16g`](seq-read-32th-16g.f): 32 threads sequentially read from 32 0.5GB files. Each thread reads its own file.
-* [`seq-write-1th-16g`](seq-write-1th-16g.f): 1 thread sequentially writes to a single preallocated 16GB file.
-* [`seq-write-32th-16g`](seq-write-32th-16g.f): 32 threads sequentially writes to 32 0.5GB files. Each thread writes its own file.
-* [`seq-fsync-1th-16g`](seq-fsync-1th-16g.f): 1 thread sequentially writes, then fsyncs, to a single preallocated 16GB file.
-* [`seq-fsync-32th-16g`](seq-fsync-32th-16g.f): 32 threads sequentially writes, then fsyncs, to 32 0.5GB files. Each thread writes its own file.
-
-2. Efficiency of swapping tmpfs to disk (64GB files so it cannot fit in memory, always 32 threads since that's no longer the variable):
+1. Single-threaded vs multi-threaded FUSE:
+* [`seq-read-1th-64g`](seq-read-1th-64g.f): 1 thread sequentially reads from a single preallocated 64GB file.
 * [`seq-read-32th-64g`](seq-read-32th-64g.f): 32 threads sequentially read from 32 2GB files. Each thread reads its own file.
-* [`rnd-read-32th-64g`](rnd-read-32th-64g.f): 32 threads randomly read from 32 2GB files. Each thread reads its own file.
+* [`seq-write-1th-64g`](seq-write-1th-64g.f): 1 thread sequentially writes to a single preallocated 64GB file.
 * [`seq-write-32th-64g`](seq-write-32th-64g.f): 32 threads sequentially writes to 32 2GB files. Each thread writes its own file.
-* [`rnd-write-32th-64g`](rnd-write-32th-64g.f): 32 threads randomly writes to 32 2GB files. Each thread writes its own file.
+* [`seq-fsync-1th-64g`](seq-fsync-1th-64g.f): 1 thread sequentially writes, then fsyncs, to a single preallocated 64GB file.
 * [`seq-fsync-32th-64g`](seq-fsync-32th-64g.f): 32 threads sequentially writes, then fsyncs, to 32 2GB files. Each thread writes its own file.
+
+2. Efficiency of swapping tmpfs to disk (always 32 threads since that's no longer the variable):
+* [`rnd-read-32th-64g`](rnd-read-32th-64g.f): 32 threads randomly read from 32 2GB files. Each thread reads its own file.
+* [`rnd-write-32th-64g`](rnd-write-32th-64g.f): 32 threads randomly writes to 32 2GB files. Each thread writes its own file.
 * [`rnd-fsync-32th-64g`](rnd-fsync-32th-64g.f): 32 threads randomly writes, then fsyncs, to 32 2GB files. Each thread writes its own file.
 
 3. General applications:

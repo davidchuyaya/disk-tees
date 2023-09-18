@@ -27,6 +27,7 @@ mkdir -p $BUILD_DIR
 # FILE INSERT POINT
 
 # Create certificates and send them to CCF
+# TODO: Ideally should download certificates into a small tmpfs directory to avoid rollbacks
 cd $BUILD_DIR
 $PROJECT_DIR/cloud_scripts/create_cert.sh -t $TRUSTED_MODE -n $NAME
 CCF_ADDR=$(jq -r '.[0].ip' ${BUILD_DIR}/ccf.json)
