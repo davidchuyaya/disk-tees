@@ -4,18 +4,17 @@ set $nfiles=1
 set $meandirwidth=1
 set $nthreads=1
 set $io_size=4k
-set $iterations=16777216
+# Avoid out-of-memory error
+set $mem_size=8k
 set $file_size=64g
 
-define file name=bigfile, path=$dir, size=$file_size
+define file name=bigfile, path=$dir, size=$file_size, prealloc
 define process name=fileopen, instances=1
 {
-        thread name=fileopener, memsize=$io_size, instances=$nthreads
+        thread name=fileopener, memsize=$mem_size, instances=$nthreads
         {
-                flowop createfile name=create1, filesetname=bigfile, fd=1
-                flowop write name=write-file, filesetname=bigfile, iosize=$io_size, iters=$iterations, directio, dsync, fd=1
-                flowop closefile name=close1, fd=1
-                flowop finishoncount name=finish, value=1
+                flowop write name=write-file, filesetname=bigfile, iosize=$io_size, fd=1
+                flowop fsync name=fsync-file, fd=1
         }
 }
 
@@ -23,4 +22,5 @@ create files
 # Drop cache, as recommended by the Filebench paper
 system "sync"
 system "echo 3 > /proc/sys/vm/drop_caches"
-psrun -10
+# Since fsyncs are slow, just time out after 5 minutes
+psrun -10 300
