@@ -217,7 +217,7 @@ create_vms() {
           NUM_REPLICAS_AND_CLIENT=$(($NUM_REPLICAS + 1))
           PARAMS+=$TRUSTED_PARAMS" --count "$NUM_REPLICAS_AND_CLIENT;& # Fallthrough
         "tmpfs" | "fuse")
-          PARAMS+=" --cloud-init "$SWAP_SPACE_SCRIPT;;
+          PARAMS+=" --custom-data "$SWAP_SPACE_SCRIPT;;
         *)
           echo "Invalid file system mode selected."
           print_usage
