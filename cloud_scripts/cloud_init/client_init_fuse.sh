@@ -34,4 +34,6 @@ cd $PROJECT_DIR
 cmake .
 make
 cd $BUILD_DIR
-$PROJECT_DIR/client/tee_fuse -i $ID -t $TRUSTED_MODE -u $USERNAME $DIR
+# Allow filebench to write to the directory. See https://unix.stackexchange.com/a/17423/386668
+echo "user_allow_other" | sudo tee /etc/fuse.conf 
+$PROJECT_DIR/client/tee_fuse -i $ID -t $TRUSTED_MODE -u $USERNAME -o allow_other $DIR

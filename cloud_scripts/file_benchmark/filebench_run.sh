@@ -66,7 +66,7 @@ case $FILE_SYSTEM_MODE in
         pgrep -f tee_fuse | xargs kill -9
         sudo umount $DIR
         sudo mount -t tmpfs -o size=${TMPFS_MEMORY}G tmpfs $BUILD_DIR/storage
-        $PROJECT_DIR/client/tee_fuse -i 0 -t $TRUSTED_MODE -u $USERNAME $DIR
+        $PROJECT_DIR/client/tee_fuse -i 0 -t $TRUSTED_MODE -u $USERNAME -o allow_other $DIR
     done;;
   "rollbaccine")
     echo "Unimplemented. Need to tell replicas to clear directory, then restart client without contacting CCF";;

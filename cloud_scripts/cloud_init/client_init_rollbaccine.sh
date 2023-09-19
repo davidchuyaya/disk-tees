@@ -63,6 +63,8 @@ make
 cd $BUILD_DIR
 # tee_fuse has issues if it's run too early after cmake?
 sleep 1
-$PROJECT_DIR/client/tee_fuse -i $ID -t $TRUSTED_MODE -u $USERNAME -n -m -f -s $DIR > $BUILD_DIR/log.txt 2>&1 &
+# Allow filebench to write to the directory. See https://unix.stackexchange.com/a/17423/386668
+echo "user_allow_other" | sudo tee /etc/fuse.conf 
+$PROJECT_DIR/client/tee_fuse -i $ID -t $TRUSTED_MODE -u $USERNAME -n -m -o allow_other -f -s $DIR > $BUILD_DIR/log.txt 2>&1 &
 # Install and run benchmark
 sleep $WAIT_SECS
