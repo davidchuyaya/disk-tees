@@ -2,7 +2,7 @@
 disk_setup:
   ephemeral0:
     table_type: mbr
-    layout: [33, [66, 82]] # 33% (400 GB of the 600 GB will be mounted as swap space for tmpfs)
+    layout: [33, [66, 82]] # 66% (200 GB of the 300 GB will be mounted as swap space for tmpfs)
     overwrite: True
 fs_setup:
   - device: ephemeral0.1

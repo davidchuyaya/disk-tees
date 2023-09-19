@@ -153,9 +153,9 @@ case $TRUSTED_MODE in
     LOCATION="northeurope"
     ZONE=3
     if [[ $FILE_SYSTEM_MODE == "normal" ]]; then
-      VM_SIZE="Standard_DC16as_v5"
+      VM_SIZE="Standard_DC8as_v5"
     else
-      VM_SIZE="Standard_DC16ads_v5" # Use VM with emphemeral disk for tmpfs, as recommended here: https://learn.microsoft.com/en-us/troubleshoot/azure/virtual-machines/create-swap-file-linux-vm
+      VM_SIZE="Standard_DC8ads_v5" # Use VM with emphemeral disk for tmpfs, as recommended here: https://learn.microsoft.com/en-us/troubleshoot/azure/virtual-machines/create-swap-file-linux-vm
     fi
     if [[ $FILE_SYSTEM_MODE == "rollbaccine" ]]; then
       CCF_VM_SIZE="Standard_DC2as_v5" # Use as few cores as possible for CCF since it's not on the critical path
@@ -164,9 +164,9 @@ case $TRUSTED_MODE in
     LOCATION="swedencentral"
     ZONE=2
     if [[ $FILE_SYSTEM_MODE == "normal" ]]; then
-      VM_SIZE="Standard_D16as_v5"
+      VM_SIZE="Standard_D8as_v5"
     else
-      VM_SIZE="Standard_D16ads_v5"
+      VM_SIZE="Standard_D8ads_v5"
     fi;;
   *)
     echo "Invalid trusted mode selected."
