@@ -1,0 +1,133 @@
+Filebench Version 1.5-alpha3
+0.000: Allocated 1505MB of shared memory
+0.001: Populating and pre-allocating filesets
+0.001: Removing bigfile tree (if exists)
+0.004: Pre-allocating directories in bigfile tree
+0.004: Pre-allocating files in bigfile tree
+51.460: Waiting for pre-allocation to finish (in case of a parallel pre-allocation)
+51.461: Population and pre-allocation of filesets completed
+52.387: Attempting to create fileset more than once, ignoring
+52.388: Starting 1 fileopen instances
+53.396: Running...
+63.398: Per-Operation Breakdown
+fsync-file           283668ops    28362ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.03ms]
+write-file           283669ops    28362ops/s 110.8mb/s      0.0ms/op [0.00ms - 32.39ms]
+63.398: IO Summary: 567337 ops 56724.097 ops/s 0/28362 rd/wr 110.8mb/s   0.0ms/op
+73.400: Per-Operation Breakdown
+fsync-file           283200ops    28317ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           283200ops    28317ops/s 110.6mb/s      0.0ms/op [0.00ms - 33.93ms]
+73.400: IO Summary: 566400 ops 56633.272 ops/s 0/28317 rd/wr 110.6mb/s   0.0ms/op
+83.401: Per-Operation Breakdown
+fsync-file           281955ops    28191ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.11ms]
+write-file           281955ops    28191ops/s 110.1mb/s      0.0ms/op [0.00ms - 25.99ms]
+83.401: IO Summary: 563910 ops 56382.954 ops/s 0/28191 rd/wr 110.1mb/s   0.0ms/op
+93.403: Per-Operation Breakdown
+fsync-file           250560ops    25052ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.06ms]
+write-file           250560ops    25052ops/s  97.9mb/s      0.0ms/op [0.00ms - 52.86ms]
+93.403: IO Summary: 501120 ops 50103.352 ops/s 0/25052 rd/wr  97.9mb/s   0.0ms/op
+103.405: Per-Operation Breakdown
+fsync-file           249975ops    24994ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.06ms]
+write-file           249975ops    24994ops/s  97.6mb/s      0.0ms/op [0.00ms - 50.22ms]
+103.405: IO Summary: 499950 ops 49987.392 ops/s 0/24994 rd/wr  97.6mb/s   0.0ms/op
+113.406: Per-Operation Breakdown
+fsync-file           251249ops    25121ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.06ms]
+write-file           251249ops    25121ops/s  98.1mb/s      0.0ms/op [0.00ms - 13.92ms]
+113.406: IO Summary: 502498 ops 50241.942 ops/s 0/25121 rd/wr  98.1mb/s   0.0ms/op
+123.408: Per-Operation Breakdown
+fsync-file           247154ops    24712ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.06ms]
+write-file           247154ops    24712ops/s  96.5mb/s      0.0ms/op [0.00ms - 31.79ms]
+123.408: IO Summary: 494308 ops 49423.307 ops/s 0/24712 rd/wr  96.5mb/s   0.0ms/op
+133.409: Per-Operation Breakdown
+fsync-file           252018ops    25198ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           252017ops    25198ops/s  98.4mb/s      0.0ms/op [0.00ms - 15.15ms]
+133.410: IO Summary: 504035 ops 50396.666 ops/s 0/25198 rd/wr  98.4mb/s   0.0ms/op
+143.411: Per-Operation Breakdown
+fsync-file           282365ops    28232ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.05ms]
+write-file           282365ops    28232ops/s 110.3mb/s      0.0ms/op [0.00ms -  4.37ms]
+143.411: IO Summary: 564730 ops 56464.169 ops/s 0/28232 rd/wr 110.3mb/s   0.0ms/op
+153.413: Per-Operation Breakdown
+fsync-file           250307ops    25028ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.05ms]
+write-file           250307ops    25028ops/s  97.8mb/s      0.0ms/op [0.00ms - 46.89ms]
+153.413: IO Summary: 500614 ops 50055.058 ops/s 0/25028 rd/wr  97.8mb/s   0.0ms/op
+163.414: Per-Operation Breakdown
+fsync-file           280907ops    28087ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.05ms]
+write-file           280907ops    28087ops/s 109.7mb/s      0.0ms/op [0.00ms - 31.64ms]
+163.414: IO Summary: 561814 ops 56174.350 ops/s 0/28087 rd/wr 109.7mb/s   0.0ms/op
+173.415: Per-Operation Breakdown
+fsync-file           252803ops    25277ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           252802ops    25277ops/s  98.7mb/s      0.0ms/op [0.00ms - 19.91ms]
+173.415: IO Summary: 505605 ops 50553.503 ops/s 0/25277 rd/wr  98.7mb/s   0.0ms/op
+183.417: Per-Operation Breakdown
+fsync-file           254954ops    25491ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           254954ops    25491ops/s  99.6mb/s      0.0ms/op [0.00ms -  4.88ms]
+183.417: IO Summary: 509908 ops 50982.597 ops/s 0/25491 rd/wr  99.6mb/s   0.0ms/op
+193.419: Per-Operation Breakdown
+fsync-file           252606ops    25256ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           252606ops    25256ops/s  98.7mb/s      0.0ms/op [0.00ms - 48.60ms]
+193.419: IO Summary: 505212 ops 50512.961 ops/s 0/25256 rd/wr  98.7mb/s   0.0ms/op
+203.420: Per-Operation Breakdown
+fsync-file           249714ops    24968ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           249713ops    24967ops/s  97.5mb/s      0.0ms/op [0.00ms - 10.56ms]
+203.420: IO Summary: 499427 ops 49935.075 ops/s 0/24967 rd/wr  97.5mb/s   0.0ms/op
+213.422: Per-Operation Breakdown
+fsync-file           253217ops    25318ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           253216ops    25318ops/s  98.9mb/s      0.0ms/op [0.00ms - 16.19ms]
+213.422: IO Summary: 506433 ops 50635.472 ops/s 0/25318 rd/wr  98.9mb/s   0.0ms/op
+223.424: Per-Operation Breakdown
+fsync-file           251168ops    25113ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           251167ops    25113ops/s  98.1mb/s      0.0ms/op [0.00ms - 31.16ms]
+223.424: IO Summary: 502335 ops 50226.142 ops/s 0/25113 rd/wr  98.1mb/s   0.0ms/op
+233.425: Per-Operation Breakdown
+fsync-file           276878ops    27684ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.10ms]
+write-file           276878ops    27684ops/s 108.1mb/s      0.0ms/op [0.00ms - 35.84ms]
+233.425: IO Summary: 553756 ops 55367.627 ops/s 0/27684 rd/wr 108.1mb/s   0.0ms/op
+243.427: Per-Operation Breakdown
+fsync-file           252284ops    25225ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.05ms]
+write-file           252283ops    25225ops/s  98.5mb/s      0.0ms/op [0.00ms - 21.38ms]
+243.427: IO Summary: 504567 ops 50450.258 ops/s 0/25225 rd/wr  98.5mb/s   0.0ms/op
+253.428: Per-Operation Breakdown
+fsync-file           279220ops    27919ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.05ms]
+write-file           279221ops    27919ops/s 109.1mb/s      0.0ms/op [0.00ms -  5.67ms]
+253.428: IO Summary: 558441 ops 55837.148 ops/s 0/27919 rd/wr 109.1mb/s   0.0ms/op
+263.430: Per-Operation Breakdown
+fsync-file           255251ops    25521ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           255250ops    25521ops/s  99.7mb/s      0.0ms/op [0.00ms - 11.33ms]
+263.430: IO Summary: 510501 ops 51042.581 ops/s 0/25521 rd/wr  99.7mb/s   0.0ms/op
+273.431: Per-Operation Breakdown
+fsync-file           279470ops    27943ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.08ms]
+write-file           279470ops    27943ops/s 109.2mb/s      0.0ms/op [0.00ms - 17.54ms]
+273.431: IO Summary: 558940 ops 55885.047 ops/s 0/27943 rd/wr 109.2mb/s   0.0ms/op
+283.433: Per-Operation Breakdown
+fsync-file           249953ops    24992ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.05ms]
+write-file           249953ops    24992ops/s  97.6mb/s      0.0ms/op [0.00ms -  7.15ms]
+283.433: IO Summary: 499906 ops 49983.267 ops/s 0/24992 rd/wr  97.6mb/s   0.0ms/op
+293.434: Per-Operation Breakdown
+fsync-file           254240ops    25420ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           254239ops    25420ops/s  99.3mb/s      0.0ms/op [0.00ms - 48.79ms]
+293.434: IO Summary: 508479 ops 50840.371 ops/s 0/25420 rd/wr  99.3mb/s   0.0ms/op
+303.436: Per-Operation Breakdown
+fsync-file           283023ops    28299ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.05ms]
+write-file           283023ops    28299ops/s 110.5mb/s      0.0ms/op [0.00ms - 16.36ms]
+303.436: IO Summary: 566046 ops 56598.272 ops/s 0/28299 rd/wr 110.5mb/s   0.0ms/op
+313.437: Per-Operation Breakdown
+fsync-file           283217ops    28317ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.05ms]
+write-file           283217ops    28317ops/s 110.6mb/s      0.0ms/op [0.00ms - 24.12ms]
+313.437: IO Summary: 566434 ops 56634.825 ops/s 0/28317 rd/wr 110.6mb/s   0.0ms/op
+323.439: Per-Operation Breakdown
+fsync-file           281443ops    28140ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.05ms]
+write-file           281443ops    28140ops/s 109.9mb/s      0.0ms/op [0.00ms - 11.23ms]
+323.439: IO Summary: 562886 ops 56279.944 ops/s 0/28140 rd/wr 109.9mb/s   0.0ms/op
+333.441: Per-Operation Breakdown
+fsync-file           255459ops    25542ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.04ms]
+write-file           255458ops    25542ops/s  99.8mb/s      0.0ms/op [0.00ms - 12.16ms]
+333.441: IO Summary: 510917 ops 51083.787 ops/s 0/25542 rd/wr  99.8mb/s   0.0ms/op
+343.442: Per-Operation Breakdown
+fsync-file           252463ops    25243ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.12ms]
+write-file           252462ops    25243ops/s  98.6mb/s      0.0ms/op [0.00ms - 32.43ms]
+343.442: IO Summary: 504925 ops 50485.730 ops/s 0/25243 rd/wr  98.6mb/s   0.0ms/op
+353.443: Run took 300 seconds...
+353.443: Per-Operation Breakdown
+fsync-file           249221ops    24919ops/s   0.0mb/s      0.0ms/op [0.00ms -  0.07ms]
+write-file           249220ops    24919ops/s  97.3mb/s      0.0ms/op [0.00ms - 33.99ms]
+353.443: IO Summary: 498441 ops 49837.701 ops/s 0/24919 rd/wr  97.3mb/s   0.0ms/op
+353.443: Shutting down processes
