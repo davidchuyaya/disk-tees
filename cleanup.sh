@@ -55,6 +55,7 @@ rm -f ~/disk-tees/build/ccf.json
 rm -f ~/disk-tees/build/replicas.json
 rm -f ~/disk-tees/build/vms.json
 rm -f ~/disk-tees/build/ccf.log
+rm -f ~/disk-tees/build/ccf_ansible_inventory
 
 # Delete resource groups
 if [ "$CLEANUP_REMOTE" = true ]
