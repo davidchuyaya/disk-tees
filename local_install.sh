@@ -12,8 +12,10 @@ sudo apt install software-properties-common -y
 sudo add-apt-repository -y --update ppa:ansible/ansible
 sudo apt install ansible -y
 
-cloud_scripts/benchbase_install.sh -t local
-cloud_scripts/postgres_install.sh -t local
+USERNAME=$(whoami)
+cloud_scripts/db_benchmark/benchbase_install.sh -u $USERNAME
+cloud_scripts/db_benchmark/postgres_install.sh -u $USERNAME
+cloud_scripts/file_benchmark/filebench_install.sh -u $USERNAME
 
 # Graphing experiments
 python -m pip install -U matplotlib
